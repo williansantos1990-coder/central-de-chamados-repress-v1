@@ -47,9 +47,9 @@ export default function Layout() {
   return (
     <SidebarProvider>
       <Sidebar variant="inset">
-        <SidebarHeader className="h-16 flex items-center px-4 border-b">
-          <div className="font-bold text-lg text-primary flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded flex items-center justify-center text-primary-foreground">
+        <SidebarHeader className="h-16 flex items-center px-4 border-b border-sidebar-border">
+          <div className="font-bold text-lg text-sidebar-foreground flex items-center gap-2">
+            <div className="w-8 h-8 bg-sidebar-primary rounded flex items-center justify-center text-sidebar-primary-foreground">
               R
             </div>
             Repress
@@ -79,7 +79,7 @@ export default function Layout() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter className="border-t p-4">
+        <SidebarFooter className="border-t border-sidebar-border p-4">
           <div className="flex items-center gap-3">
             <Avatar>
               <AvatarImage src={profile?.avatar_url || ''} />

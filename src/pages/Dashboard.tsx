@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-const priorityColors = { low: '#22c55e', medium: '#3b82f6', high: '#f97316', critical: '#dc2626' }
+const priorityColors = { low: '#22c55e', medium: '#0ea5e9', high: '#f97316', critical: '#dc2626' }
 const statusColors = {
   open: '#3b82f6',
   analyzing: '#a855f7',
