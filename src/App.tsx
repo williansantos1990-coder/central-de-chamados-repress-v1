@@ -8,6 +8,8 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import TicketList from './pages/tickets/TicketList'
 import NewTicket from './pages/tickets/NewTicket'
 import TicketDetail from './pages/tickets/TicketDetail'
@@ -24,6 +26,8 @@ const App = () => (
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/tickets" element={<TicketList />} />
