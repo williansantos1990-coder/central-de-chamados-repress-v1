@@ -9,7 +9,205 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          ticket_id: number
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id: number
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'activity_log_ticket_id_fkey'
+            columns: ['ticket_id']
+            isOneToOne: false
+            referencedRelation: 'tickets'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'activity_log_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          ticket_id: number
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id: number
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'comments_ticket_id_fkey'
+            columns: ['ticket_id']
+            isOneToOne: false
+            referencedRelation: 'tickets'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comments_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          role: Database['public']['Enums']['user_role']
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id: string
+          role?: Database['public']['Enums']['user_role']
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          role?: Database['public']['Enums']['user_role']
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          assignee_id: string | null
+          category_id: string
+          created_at: string
+          deadline: string | null
+          description: string
+          id: number
+          priority: Database['public']['Enums']['ticket_priority']
+          requester_id: string
+          status: Database['public']['Enums']['ticket_status']
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          category_id: string
+          created_at?: string
+          deadline?: string | null
+          description: string
+          id?: never
+          priority?: Database['public']['Enums']['ticket_priority']
+          requester_id: string
+          status?: Database['public']['Enums']['ticket_status']
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          category_id?: string
+          created_at?: string
+          deadline?: string | null
+          description?: string
+          id?: never
+          priority?: Database['public']['Enums']['ticket_priority']
+          requester_id?: string
+          status?: Database['public']['Enums']['ticket_status']
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tickets_assignee_id_fkey'
+            columns: ['assignee_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tickets_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tickets_requester_id_fkey'
+            columns: ['requester_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +216,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      ticket_priority: 'low' | 'medium' | 'high' | 'critical'
+      ticket_status:
+        | 'open'
+        | 'analyzing'
+        | 'waiting_requester'
+        | 'in_service'
+        | 'resolved'
+        | 'closed'
+        | 'canceled'
+      user_role: 'requester' | 'agent' | 'admin'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -143,7 +350,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      ticket_priority: ['low', 'medium', 'high', 'critical'],
+      ticket_status: [
+        'open',
+        'analyzing',
+        'waiting_requester',
+        'in_service',
+        'resolved',
+        'closed',
+        'canceled',
+      ],
+      user_role: ['requester', 'agent', 'admin'],
+    },
   },
 } as const
 
@@ -153,3 +372,131 @@ export const Constants = {
 // IMPORTANT: The TypeScript types above map UUID, TEXT, VARCHAR all to "string".
 // Use the COLUMN TYPES section below to know the real PostgreSQL type for each column.
 // Always use the correct PostgreSQL type when writing SQL migrations.
+
+// --- COLUMN TYPES (actual PostgreSQL types) ---
+// Use this to know the real database type when writing migrations.
+// "string" in TypeScript types above may be uuid, text, varchar, timestamptz, etc.
+// Table: activity_log
+//   id: uuid (not null, default: gen_random_uuid())
+//   ticket_id: bigint (not null)
+//   user_id: uuid (not null)
+//   action_type: text (not null)
+//   old_value: text (nullable)
+//   new_value: text (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: categories
+//   id: uuid (not null, default: gen_random_uuid())
+//   name: text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: comments
+//   id: uuid (not null, default: gen_random_uuid())
+//   ticket_id: bigint (not null)
+//   user_id: uuid (not null)
+//   content: text (not null)
+//   is_internal: boolean (not null, default: false)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: profiles
+//   id: uuid (not null)
+//   full_name: text (not null)
+//   email: text (not null)
+//   role: user_role (not null, default: 'requester'::user_role)
+//   avatar_url: text (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
+//   updated_at: timestamp with time zone (not null, default: now())
+// Table: tickets
+//   id: bigint (not null)
+//   title: text (not null)
+//   description: text (not null)
+//   requester_id: uuid (not null)
+//   assignee_id: uuid (nullable)
+//   category_id: uuid (not null)
+//   priority: ticket_priority (not null, default: 'low'::ticket_priority)
+//   status: ticket_status (not null, default: 'open'::ticket_status)
+//   deadline: timestamp with time zone (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
+//   updated_at: timestamp with time zone (not null, default: now())
+
+// --- CONSTRAINTS ---
+// Table: activity_log
+//   PRIMARY KEY activity_log_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY activity_log_ticket_id_fkey: FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+//   FOREIGN KEY activity_log_user_id_fkey: FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+// Table: categories
+//   PRIMARY KEY categories_pkey: PRIMARY KEY (id)
+// Table: comments
+//   PRIMARY KEY comments_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY comments_ticket_id_fkey: FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+//   FOREIGN KEY comments_user_id_fkey: FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+// Table: profiles
+//   FOREIGN KEY profiles_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+//   PRIMARY KEY profiles_pkey: PRIMARY KEY (id)
+// Table: tickets
+//   FOREIGN KEY tickets_assignee_id_fkey: FOREIGN KEY (assignee_id) REFERENCES profiles(id) ON DELETE SET NULL
+//   FOREIGN KEY tickets_category_id_fkey: FOREIGN KEY (category_id) REFERENCES categories(id)
+//   PRIMARY KEY tickets_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY tickets_requester_id_fkey: FOREIGN KEY (requester_id) REFERENCES profiles(id) ON DELETE CASCADE
+
+// --- ROW LEVEL SECURITY POLICIES ---
+// Table: activity_log
+//   Policy "Activity logs insertable by everyone" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "Activity logs viewable by agents and admins" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['agent'::user_role, 'admin'::user_role])))))
+// Table: categories
+//   Policy "Admins can manage categories" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))
+//   Policy "Categories are viewable by everyone" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: comments
+//   Policy "Comments insertable by ticket viewers" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM tickets   WHERE ((tickets.id = comments.ticket_id) AND ((tickets.requester_id = auth.uid()) OR (EXISTS ( SELECT 1            FROM profiles           WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['agent'::user_role, 'admin'::user_role])))))))))
+//   Policy "Comments viewable depending on internal flag" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: (((NOT is_internal) AND (EXISTS ( SELECT 1    FROM tickets   WHERE ((tickets.id = comments.ticket_id) AND (tickets.requester_id = auth.uid()))))) OR (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['agent'::user_role, 'admin'::user_role]))))))
+// Table: profiles
+//   Policy "Admins can update any profile" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles profiles_1   WHERE ((profiles_1.id = auth.uid()) AND (profiles_1.role = 'admin'::user_role))))
+//   Policy "Profiles are viewable by everyone" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "Users can update own profile" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (auth.uid() = id)
+//     WITH CHECK: (auth.uid() = id)
+// Table: tickets
+//   Policy "Tickets insertable by everyone" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: (requester_id = auth.uid())
+//   Policy "Tickets updatable by assignee, agents and admins" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: ((requester_id = auth.uid()) OR (assignee_id = auth.uid()) OR (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['agent'::user_role, 'admin'::user_role]))))))
+//   Policy "Tickets viewable by requester, agents and admins" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: ((requester_id = auth.uid()) OR (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['agent'::user_role, 'admin'::user_role]))))))
+
+// --- DATABASE FUNCTIONS ---
+// FUNCTION handle_new_user()
+//   CREATE OR REPLACE FUNCTION public.handle_new_user()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//     INSERT INTO public.profiles (id, full_name, email, role)
+//     VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email), NEW.email, 'requester')
+//     ON CONFLICT (id) DO NOTHING;
+//     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION handle_updated_at()
+//   CREATE OR REPLACE FUNCTION public.handle_updated_at()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   BEGIN
+//     NEW.updated_at = NOW();
+//     RETURN NEW;
+//   END;
+//   $function$
+//
+
+// --- TRIGGERS ---
+// Table: profiles
+//   set_updated_at: CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION handle_updated_at()
+// Table: tickets
+//   set_updated_at: CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION handle_updated_at()
