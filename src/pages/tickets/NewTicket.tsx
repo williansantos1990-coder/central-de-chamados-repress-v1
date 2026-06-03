@@ -18,10 +18,12 @@ import {
 import { toast } from 'sonner'
 
 export default function NewTicket() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
+
+  const isAgentOrAdmin = profile?.role === 'agent' || profile?.role === 'admin'
 
   const [form, setForm] = useState({
     title: '',
@@ -39,17 +41,19 @@ export default function NewTicket() {
     if (!user) return
     setLoading(true)
 
+    const priorityToSave = isAgentOrAdmin ? form.priority : 'low'
+
     const deadline = new Date()
-    if (form.priority === 'low') deadline.setHours(deadline.getHours() + 72)
-    else if (form.priority === 'medium') deadline.setHours(deadline.getHours() + 48)
-    else if (form.priority === 'high') deadline.setHours(deadline.getHours() + 24)
+    if (priorityToSave === 'low') deadline.setHours(deadline.getHours() + 72)
+    else if (priorityToSave === 'medium') deadline.setHours(deadline.getHours() + 48)
+    else if (priorityToSave === 'high') deadline.setHours(deadline.getHours() + 24)
     else deadline.setHours(deadline.getHours() + 4)
 
     const { data, error } = await ticketService.createTicket({
       ...form,
       requester_id: user.id,
       deadline: deadline.toISOString(),
-      priority: form.priority as any,
+      priority: priorityToSave as any,
     })
 
     setLoading(false)
@@ -108,24 +112,26 @@ export default function NewTicket() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Prioridade</Label>
-                <Select
-                  value={form.priority}
-                  onValueChange={(v) => setForm({ ...form, priority: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa (Prazo 72h)</SelectItem>
-                    <SelectItem value="medium">Média (Prazo 48h)</SelectItem>
-                    <SelectItem value="high">Alta (Prazo 24h)</SelectItem>
-                    <SelectItem value="critical">Crítica (Prazo 4h)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAgentOrAdmin && (
+                <div className="space-y-2">
+                  <Label>Prioridade</Label>
+                  <Select
+                    value={form.priority}
+                    onValueChange={(v) => setForm({ ...form, priority: v })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baixa (Prazo 72h)</SelectItem>
+                      <SelectItem value="medium">Média (Prazo 48h)</SelectItem>
+                      <SelectItem value="high">Alta (Prazo 24h)</SelectItem>
+                      <SelectItem value="critical">Crítica (Prazo 4h)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-2 bg-muted/50 py-4 border-t">

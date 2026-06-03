@@ -88,6 +88,28 @@ export default function TicketDetail() {
     }
   }
 
+  const handlePriorityChange = async (priority: string) => {
+    if (!ticket) return
+
+    const created = new Date(ticket.created_at)
+    let deadline = new Date(created)
+    if (priority === 'low') deadline.setHours(deadline.getHours() + 72)
+    else if (priority === 'medium') deadline.setHours(deadline.getHours() + 48)
+    else if (priority === 'high') deadline.setHours(deadline.getHours() + 24)
+    else deadline.setHours(deadline.getHours() + 4)
+
+    const { error } = await ticketService.updateTicket(ticket.id, {
+      priority: priority as any,
+      deadline: deadline.toISOString(),
+    })
+    if (!error) {
+      toast.success('Prioridade atualizada')
+      fetchTicket()
+    } else {
+      toast.error('Erro ao atualizar prioridade', { description: error.message })
+    }
+  }
+
   if (!ticket)
     return (
       <div className="animate-pulse flex items-center justify-center py-20 text-muted-foreground">
@@ -271,9 +293,48 @@ export default function TicketDetail() {
               <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">
                 Prioridade
               </span>
-              <Badge className={priorityMap[ticket.priority]?.color} variant="secondary">
-                {priorityMap[ticket.priority]?.label}
-              </Badge>
+              {isAgentOrAdmin && !isResolvedOrClosed ? (
+                <Select value={ticket.priority} onValueChange={handlePriorityChange}>
+                  <SelectTrigger className="h-7 w-[130px] text-xs">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-2 h-2 rounded-full ${priorityMap[ticket.priority]?.color.split(' ')[0]}`}
+                      />
+                      <span>{priorityMap[ticket.priority]?.label}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        Baixa
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        Média
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="high">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-orange-500" />
+                        Alta
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="critical">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-600" />
+                        Crítica
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge className={priorityMap[ticket.priority]?.color} variant="secondary">
+                  {priorityMap[ticket.priority]?.label}
+                </Badge>
+              )}
             </div>
 
             <div className="pt-4 border-t border-dashed">
