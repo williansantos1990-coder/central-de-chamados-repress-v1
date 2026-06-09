@@ -91,17 +91,10 @@ export default function TicketDetail() {
   const handlePriorityChange = async (priority: string) => {
     if (!ticket) return
 
-    const created = new Date(ticket.created_at)
-    let deadline = new Date(created)
-    if (priority === 'low') deadline.setHours(deadline.getHours() + 72)
-    else if (priority === 'medium') deadline.setHours(deadline.getHours() + 48)
-    else if (priority === 'high') deadline.setHours(deadline.getHours() + 24)
-    else deadline.setHours(deadline.getHours() + 4)
-
     const { error } = await ticketService.updateTicket(ticket.id, {
       priority: priority as any,
-      deadline: deadline.toISOString(),
     })
+
     if (!error) {
       toast.success('Prioridade atualizada')
       fetchTicket()

@@ -14,7 +14,16 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from '@/components/ui/sidebar'
-import { LayoutDashboard, Ticket, FilePlus, BarChart3, Settings, LogOut, Bell } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Ticket,
+  FilePlus,
+  BarChart3,
+  Settings,
+  LogOut,
+  Bell,
+  Clock,
+} from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
@@ -41,7 +50,8 @@ export default function Layout() {
       roles: ['requester', 'agent', 'admin'],
     },
     { title: 'Relatórios', url: '/reports', icon: BarChart3, roles: ['agent', 'admin'] },
-    { title: 'Administração', url: '/admin', icon: Settings, roles: ['admin'] },
+    { title: 'Usuários', url: '/admin', icon: Settings, roles: ['admin'] },
+    { title: 'Políticas SLA', url: '/admin/sla', icon: Clock, roles: ['admin'] },
   ].filter((item) => item.roles.includes(profile?.role || ''))
 
   return (

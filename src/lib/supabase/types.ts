@@ -494,9 +494,49 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION log_priority_change()
+//   CREATE OR REPLACE FUNCTION public.log_priority_change()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//     IF OLD.priority IS DISTINCT FROM NEW.priority THEN
+//       IF auth.uid() IS NOT NULL THEN
+//         INSERT INTO public.activity_log (ticket_id, user_id, action_type, old_value, new_value)
+//         VALUES (NEW.id, auth.uid(), 'priority_change', OLD.priority::text, NEW.priority::text);
+//       END IF;
+//     END IF;
+//     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION restrict_priority_update()
+//   CREATE OR REPLACE FUNCTION public.restrict_priority_update()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     user_role public.user_role;
+//   BEGIN
+//     IF OLD.priority IS DISTINCT FROM NEW.priority THEN
+//       IF auth.uid() IS NOT NULL THEN
+//         SELECT role INTO user_role FROM public.profiles WHERE id = auth.uid();
+//         IF user_role = 'requester' THEN
+//           RAISE EXCEPTION 'Apenas agentes ou administradores podem alterar a prioridade do chamado.';
+//         END IF;
+//       END IF;
+//     END IF;
+//     RETURN NEW;
+//   END;
+//   $function$
+//
 
 // --- TRIGGERS ---
 // Table: profiles
 //   set_updated_at: CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION handle_updated_at()
 // Table: tickets
+//   on_ticket_priority_change: CREATE TRIGGER on_ticket_priority_change AFTER UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION log_priority_change()
+//   on_ticket_priority_update_restrict: CREATE TRIGGER on_ticket_priority_update_restrict BEFORE UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION restrict_priority_update()
 //   set_updated_at: CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION handle_updated_at()
