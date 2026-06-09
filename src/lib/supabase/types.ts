@@ -144,6 +144,41 @@ export type Database = {
         }
         Relationships: []
       }
+      sla_policies: {
+        Row: {
+          category_id: string
+          created_at: string
+          duration_hours: number
+          id: string
+          priority: Database['public']['Enums']['ticket_priority']
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          duration_hours: number
+          id?: string
+          priority: Database['public']['Enums']['ticket_priority']
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          duration_hours?: number
+          id?: string
+          priority?: Database['public']['Enums']['ticket_priority']
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'sla_policies_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       tickets: {
         Row: {
           assignee_id: string | null
@@ -403,6 +438,13 @@ export const Constants = {
 //   avatar_url: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
 //   updated_at: timestamp with time zone (not null, default: now())
+// Table: sla_policies
+//   id: uuid (not null, default: gen_random_uuid())
+//   category_id: uuid (not null)
+//   priority: ticket_priority (not null)
+//   duration_hours: integer (not null)
+//   created_at: timestamp with time zone (not null, default: now())
+//   updated_at: timestamp with time zone (not null, default: now())
 // Table: tickets
 //   id: bigint (not null)
 //   title: text (not null)
@@ -430,6 +472,10 @@ export const Constants = {
 // Table: profiles
 //   FOREIGN KEY profiles_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 //   PRIMARY KEY profiles_pkey: PRIMARY KEY (id)
+// Table: sla_policies
+//   FOREIGN KEY sla_policies_category_id_fkey: FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+//   UNIQUE sla_policies_category_id_priority_key: UNIQUE (category_id, priority)
+//   PRIMARY KEY sla_policies_pkey: PRIMARY KEY (id)
 // Table: tickets
 //   FOREIGN KEY tickets_assignee_id_fkey: FOREIGN KEY (assignee_id) REFERENCES profiles(id) ON DELETE SET NULL
 //   FOREIGN KEY tickets_category_id_fkey: FOREIGN KEY (category_id) REFERENCES categories(id)
@@ -460,6 +506,15 @@ export const Constants = {
 //   Policy "Users can update own profile" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: (auth.uid() = id)
 //     WITH CHECK: (auth.uid() = id)
+// Table: sla_policies
+//   Policy "Admins can delete SLA policies" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))
+//   Policy "Admins can insert SLA policies" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))
+//   Policy "Admins can update SLA policies" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))
+//   Policy "SLA policies viewable by everyone" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: tickets
 //   Policy "Tickets insertable by everyone" (INSERT, PERMISSIVE) roles={authenticated}
 //     WITH CHECK: (requester_id = auth.uid())
@@ -469,6 +524,30 @@ export const Constants = {
 //     USING: ((requester_id = auth.uid()) OR (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['agent'::user_role, 'admin'::user_role]))))))
 
 // --- DATABASE FUNCTIONS ---
+// FUNCTION calculate_ticket_deadline()
+//   CREATE OR REPLACE FUNCTION public.calculate_ticket_deadline()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   DECLARE
+//     sla_hours INTEGER;
+//   BEGIN
+//     IF TG_OP = 'INSERT' THEN
+//       SELECT duration_hours INTO sla_hours FROM public.sla_policies
+//       WHERE category_id = NEW.category_id AND priority = NEW.priority;
+//     ELSIF OLD.category_id IS DISTINCT FROM NEW.category_id OR OLD.priority IS DISTINCT FROM NEW.priority THEN
+//       SELECT duration_hours INTO sla_hours FROM public.sla_policies
+//       WHERE category_id = NEW.category_id AND priority = NEW.priority;
+//     END IF;
+//
+//     IF sla_hours IS NOT NULL THEN
+//       NEW.deadline := NEW.created_at + (sla_hours || ' hours')::interval;
+//     END IF;
+//
+//     RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION handle_new_user()
 //   CREATE OR REPLACE FUNCTION public.handle_new_user()
 //    RETURNS trigger
@@ -536,7 +615,14 @@ export const Constants = {
 // --- TRIGGERS ---
 // Table: profiles
 //   set_updated_at: CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION handle_updated_at()
+// Table: sla_policies
+//   set_sla_updated_at: CREATE TRIGGER set_sla_updated_at BEFORE UPDATE ON public.sla_policies FOR EACH ROW EXECUTE FUNCTION handle_updated_at()
 // Table: tickets
 //   on_ticket_priority_change: CREATE TRIGGER on_ticket_priority_change AFTER UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION log_priority_change()
 //   on_ticket_priority_update_restrict: CREATE TRIGGER on_ticket_priority_update_restrict BEFORE UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION restrict_priority_update()
+//   on_ticket_sla_calculate: CREATE TRIGGER on_ticket_sla_calculate BEFORE INSERT OR UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION calculate_ticket_deadline()
 //   set_updated_at: CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION handle_updated_at()
+
+// --- INDEXES ---
+// Table: sla_policies
+//   CREATE UNIQUE INDEX sla_policies_category_id_priority_key ON public.sla_policies USING btree (category_id, priority)

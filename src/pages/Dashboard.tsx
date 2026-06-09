@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { ticketService, Ticket } from '@/services/tickets'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart'
 import { Bar, BarChart, Pie, PieChart, Cell, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
@@ -78,6 +84,44 @@ export default function Dashboard() {
     }))
     .filter((d) => d.value > 0)
 
+  let onTime = 0
+  let overdue = 0
+  let hasSlaTickets = false
+
+  tickets.forEach((t) => {
+    if (!t.deadline) return
+    hasSlaTickets = true
+    const deadline = new Date(t.deadline).getTime()
+
+    if (['resolved', 'closed'].includes(t.status)) {
+      const updated = new Date(t.updated_at).getTime()
+      if (updated <= deadline) {
+        onTime++
+      } else {
+        overdue++
+      }
+    } else if (t.status !== 'canceled') {
+      const now = new Date().getTime()
+      if (now > deadline) {
+        overdue++
+      } else {
+        onTime++
+      }
+    }
+  })
+
+  const slaData = hasSlaTickets
+    ? [
+        { name: 'on_time', value: onTime, fill: '#3b82f6' },
+        { name: 'overdue', value: overdue, fill: '#f97316' },
+      ].filter((d) => d.value > 0)
+    : []
+
+  const slaChartConfig = {
+    on_time: { label: 'No Prazo', color: '#3b82f6' },
+    overdue: { label: 'Atrasado', color: '#f97316' },
+  }
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -119,8 +163,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="col-span-1 md:col-span-2">
           <CardHeader>
             <CardTitle>Chamados por Prioridade</CardTitle>
           </CardHeader>
@@ -146,7 +190,7 @@ export default function Dashboard() {
             </ChartContainer>
           </CardContent>
         </Card>
-        <Card className="col-span-3">
+        <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Distribuição de Status</CardTitle>
           </CardHeader>
@@ -177,42 +221,83 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Atividades Recentes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {tickets.slice(0, 5).map((ticket) => (
-              <Link
-                key={ticket.id}
-                to={`/tickets/${ticket.id}`}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="col-span-1 md:col-span-2 flex flex-col">
+          <CardHeader>
+            <CardTitle>Atividades Recentes</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <div className="space-y-4">
+              {tickets.slice(0, 5).map((ticket) => (
+                <Link
+                  key={ticket.id}
+                  to={`/tickets/${ticket.id}`}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium">
+                      #{ticket.id} - {ticket.title}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {ticket.requester?.full_name} •{' '}
+                      {format(new Date(ticket.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="capitalize">
+                      {chartConfig[ticket.status as keyof typeof chartConfig]?.label}
+                    </Badge>
+                  </div>
+                </Link>
+              ))}
+              {tickets.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhum chamado encontrado.
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle>Cumprimento de SLA</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {hasSlaTickets ? (
+              <ChartContainer
+                config={slaChartConfig}
+                className="h-[300px] w-full flex items-center justify-center"
               >
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">
-                    #{ticket.id} - {ticket.title}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {ticket.requester?.full_name} •{' '}
-                    {format(new Date(ticket.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR })}
-                  </span>
+                <PieChart>
+                  <Pie
+                    data={slaData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                  >
+                    {slaData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-center text-muted-foreground p-4">
+                <div className="bg-muted/50 rounded-lg p-6 border-dashed border-2">
+                  <p>Nenhum dado de SLA disponível para acompanhamento.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="capitalize">
-                    {chartConfig[ticket.status as keyof typeof chartConfig]?.label}
-                  </Badge>
-                </div>
-              </Link>
-            ))}
-            {tickets.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                Nenhum chamado encontrado.
               </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
