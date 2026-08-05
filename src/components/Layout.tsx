@@ -50,7 +50,6 @@ export default function Layout() {
       icon: FilePlus,
       roles: ['requester', 'agent', 'admin'],
     },
-    { title: 'Produtividade', url: '/admin/productivity', icon: Users, roles: ['agent', 'admin'] },
     { title: 'Relatórios', url: '/reports', icon: BarChart3, roles: ['agent', 'admin'] },
     { title: 'Usuários', url: '/admin', icon: Settings, roles: ['admin'] },
     { title: 'Políticas SLA', url: '/admin/sla', icon: Clock, roles: ['admin'] },
