@@ -50,6 +50,22 @@ export function getSolutionTimeHours(priority: string): number {
   return SLA_PRIORITY_CONFIG[priority]?.solutionTimeHours ?? 72
 }
 
+export function getTicketResponseTimeHours(
+  ticket: Ticket,
+  policies?: SlaPolicyData[] | any[],
+): number {
+  if (!ticket) return 8
+  if (policies && Array.isArray(policies) && ticket.category_id && ticket.priority) {
+    const policy = policies.find(
+      (p) => p.category_id === ticket.category_id && p.priority === ticket.priority,
+    )
+    if (policy && policy.response_time_hours != null) {
+      return Number(policy.response_time_hours)
+    }
+  }
+  return getResponseTimeHours(ticket.priority)
+}
+
 export function getTimeRemainingHours(deadline: string): number {
   const now = new Date().getTime()
   const dl = new Date(deadline).getTime()
@@ -245,4 +261,41 @@ export function isSolutionTimeOverdue(ticket: Ticket, policyMap: SlaPolicyMap): 
   if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
   if (ticket.deadline && new Date() > new Date(ticket.deadline)) return true
   return false
+}
+
+export interface SlaCountdownResult {
+  text: string
+  isExpired: boolean
+  isWarning: boolean
+  remainingMs: number
+}
+
+export function formatSlaCountdown(
+  deadline: string | Date,
+  nowMs: number = Date.now(),
+): SlaCountdownResult {
+  const deadlineMs = new Date(deadline).getTime()
+  const remainingMs = deadlineMs - nowMs
+
+  if (remainingMs <= 0) {
+    return {
+      text: 'Expirado',
+      isExpired: true,
+      isWarning: false,
+      remainingMs: 0,
+    }
+  }
+
+  const totalSeconds = Math.floor(remainingMs / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const timeStr = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  const text = days > 0 ? `${days}d ${timeStr}` : timeStr
+  const isWarning = totalSeconds <= 3600
+
+  return { text, isExpired: false, isWarning, remainingMs }
 }

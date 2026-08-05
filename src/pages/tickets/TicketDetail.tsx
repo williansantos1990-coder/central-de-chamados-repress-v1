@@ -20,8 +20,8 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Progress } from '@/components/ui/progress'
 import { SlaRiskBadge } from '@/components/sla-risk-badge'
+import { SlaCountdown } from '@/components/sla-countdown'
 
 const statusMap: Record<string, string> = {
   open: 'Aberto',
@@ -114,19 +114,6 @@ export default function TicketDetail() {
 
   const isAgentOrAdmin = profile?.role === 'agent' || profile?.role === 'admin'
   const isResolvedOrClosed = ['resolved', 'closed', 'canceled'].includes(ticket.status)
-
-  // Calculate SLA Progress
-  let progress = 100
-  let slaText = 'Sem prazo'
-  if (ticket.deadline && !isResolvedOrClosed) {
-    const created = new Date(ticket.created_at).getTime()
-    const deadline = new Date(ticket.deadline).getTime()
-    const now = new Date().getTime()
-    const totalDuration = deadline - created
-    const elapsed = now - created
-    progress = Math.max(0, Math.min(100, 100 - (elapsed / totalDuration) * 100))
-    slaText = formatDistanceToNow(new Date(ticket.deadline), { addSuffix: true, locale: ptBR })
-  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
@@ -344,37 +331,7 @@ export default function TicketDetail() {
               )}
             </div>
 
-            <div className="pt-4 border-t border-dashed">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-muted-foreground text-xs uppercase tracking-wider">
-                  SLA / Prazo de Resolução
-                </span>
-                <SlaRiskBadge ticket={ticket} />
-              </div>
-              {ticket.deadline ? (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span>{isResolvedOrClosed ? 'Encerrado' : 'Tempo Restante'}</span>
-                    <span
-                      className={
-                        !isResolvedOrClosed && progress === 0 ? 'text-destructive font-bold' : ''
-                      }
-                    >
-                      {slaText}
-                    </span>
-                  </div>
-                  <Progress
-                    value={isResolvedOrClosed ? 100 : progress}
-                    className={`h-2 ${!isResolvedOrClosed && progress === 0 ? 'bg-destructive/20 [&>div]:bg-destructive' : ''}`}
-                  />
-                  <div className="text-xs text-muted-foreground text-right">
-                    Prazo: {format(new Date(ticket.deadline), 'dd/MM/yyyy HH:mm')}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-muted-foreground text-xs">Sem prazo definido</div>
-              )}
-            </div>
+            <SlaCountdown ticket={ticket} comments={comments} isAgentOrAdmin={isAgentOrAdmin} />
           </CardContent>
         </Card>
       </div>
