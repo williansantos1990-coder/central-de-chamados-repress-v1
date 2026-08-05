@@ -14,7 +14,6 @@ import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { format } from 'date-fns'
 import { SlaRiskBadge } from '@/components/sla-risk-badge'
-import { SlaRiskBadge } from '@/components/sla-risk-badge'
 
 const priorityMap: Record<string, { label: string; color: string }> = {
   low: { label: 'Baixa', color: 'bg-green-500 hover:bg-green-600 text-white border-transparent' },
