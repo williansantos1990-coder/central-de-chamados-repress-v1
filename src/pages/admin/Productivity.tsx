@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { reportService, AgentProductivity } from '@/services/reports'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Bar, BarChart, XAxis, YAxis, Cell } from 'recharts'
+import { Bar, BarChart, XAxis, YAxis } from 'recharts'
 import { Users, CheckCircle2, AlertCircle, TrendingUp, Clock } from 'lucide-react'
 
 export default function Productivity() {
@@ -14,7 +14,7 @@ export default function Productivity() {
 
   useEffect(() => {
     reportService.getProductivity().then((result) => {
-      setData(result.agents)
+      setData(result ?? [])
       setLoading(false)
     })
   }, [])
@@ -29,15 +29,15 @@ export default function Productivity() {
   }
 
   const chartData = data.map((a) => ({
-    name: a.agentName.split(' ')[0],
-    resolved: a.totalResolved,
-    overdue: a.totalOverdue,
+    name: a.assignee_name.split(' ')[0],
+    resolved: a.total_resolved,
+    overdue: a.total_overdue,
   }))
 
-  const totalResolved = data.reduce((sum, a) => sum + a.totalResolved, 0)
-  const totalOverdue = data.reduce((sum, a) => sum + a.totalOverdue, 0)
+  const totalResolved = data.reduce((sum, a) => sum + a.total_resolved, 0)
+  const totalOverdue = data.reduce((sum, a) => sum + a.total_overdue, 0)
   const avgCompliance =
-    data.length > 0 ? data.reduce((sum, a) => sum + a.slaCompliance, 0) / data.length : 0
+    data.length > 0 ? data.reduce((sum, a) => sum + a.sla_compliance_pct, 0) / data.length : 0
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -125,34 +125,34 @@ export default function Productivity() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {data.map((agent) => (
-                <Card key={agent.agentId} className="border-primary/20">
+                <Card key={agent.assignee_id} className="border-primary/20">
                   <CardContent className="pt-6 space-y-3">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm">
-                        {agent.agentName.charAt(0)}
+                        {agent.assignee_name.charAt(0)}
                       </div>
-                      <span className="font-semibold">{agent.agentName}</span>
+                      <span className="font-semibold">{agent.assignee_name}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="bg-muted/50 rounded-lg p-2">
                         <span className="text-xs text-muted-foreground block">Resolvidos</span>
-                        <span className="font-bold text-blue-600">{agent.totalResolved}</span>
+                        <span className="font-bold text-blue-600">{agent.total_resolved}</span>
                       </div>
                       <div className="bg-muted/50 rounded-lg p-2">
                         <span className="text-xs text-muted-foreground block">Atrasados</span>
-                        <span className="font-bold text-orange-600">{agent.totalOverdue}</span>
+                        <span className="font-bold text-orange-600">{agent.total_overdue}</span>
                       </div>
                       <div className="bg-muted/50 rounded-lg p-2">
                         <span className="text-xs text-muted-foreground block">% SLA</span>
-                        <span className="font-bold">{agent.slaCompliance.toFixed(0)}%</span>
+                        <span className="font-bold">{agent.sla_compliance_pct.toFixed(0)}%</span>
                       </div>
                       <div className="bg-muted/50 rounded-lg p-2">
                         <span className="text-xs text-muted-foreground block">Tempo Médio</span>
                         <span className="font-bold flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {agent.avgResolutionHours < 24
-                            ? `${agent.avgResolutionHours.toFixed(1)}h`
-                            : `${(agent.avgResolutionHours / 24).toFixed(1)}d`}
+                          {agent.avg_resolution_hours < 24
+                            ? `${agent.avg_resolution_hours.toFixed(1)}h`
+                            : `${(agent.avg_resolution_hours / 24).toFixed(1)}d`}
                         </span>
                       </div>
                     </div>
