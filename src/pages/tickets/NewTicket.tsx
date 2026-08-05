@@ -16,14 +16,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { SLA_PRIORITY_CONFIG, getSolutionTimeHours } from '@/lib/sla-utils'
+import { Clock, ShieldAlert, Info } from 'lucide-react'
 
 export default function NewTicket() {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
-
-  const isAgentOrAdmin = profile?.role === 'agent' || profile?.role === 'admin'
 
   const [form, setForm] = useState({
     title: '',
@@ -36,24 +36,22 @@ export default function NewTicket() {
     categoryService.getCategories().then(({ data }) => setCategories(data || []))
   }, [])
 
+  const selectedSla = SLA_PRIORITY_CONFIG[form.priority]
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
     setLoading(true)
 
-    const priorityToSave = isAgentOrAdmin ? form.priority : 'low'
-
+    const solutionHours = getSolutionTimeHours(form.priority)
     const deadline = new Date()
-    if (priorityToSave === 'low') deadline.setHours(deadline.getHours() + 72)
-    else if (priorityToSave === 'medium') deadline.setHours(deadline.getHours() + 48)
-    else if (priorityToSave === 'high') deadline.setHours(deadline.getHours() + 24)
-    else deadline.setHours(deadline.getHours() + 4)
+    deadline.setHours(deadline.getHours() + solutionHours)
 
     const { data, error } = await ticketService.createTicket({
       ...form,
       requester_id: user.id,
       deadline: deadline.toISOString(),
-      priority: priorityToSave as any,
+      priority: form.priority as any,
     })
 
     setLoading(false)
@@ -82,16 +80,18 @@ export default function NewTicket() {
                 placeholder="Resumo breve do problema..."
               />
             </div>
+
             <div className="space-y-2">
               <Label>Descrição</Label>
               <Textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 required
-                rows={8}
+                rows={7}
                 placeholder="Descreva os detalhes da sua solicitação..."
               />
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Categoria</Label>
@@ -112,28 +112,43 @@ export default function NewTicket() {
                   </SelectContent>
                 </Select>
               </div>
-              {isAgentOrAdmin && (
-                <div className="space-y-2">
-                  <Label>Prioridade</Label>
-                  <Select
-                    value={form.priority}
-                    onValueChange={(v) => setForm({ ...form, priority: v })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baixa (Prazo 72h)</SelectItem>
-                      <SelectItem value="medium">Média (Prazo 48h)</SelectItem>
-                      <SelectItem value="high">Alta (Prazo 24h)</SelectItem>
-                      <SelectItem value="critical">Crítica (Prazo 4h)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+
+              <div className="space-y-2">
+                <Label>Prioridade / Criticidade</Label>
+                <Select
+                  value={form.priority}
+                  onValueChange={(v) => setForm({ ...form, priority: v })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Baixa (Ajustes / Dúvidas simples)</SelectItem>
+                    <SelectItem value="medium">Média (Impacta um usuário)</SelectItem>
+                    <SelectItem value="high">Alta (Impacta setor inteiro)</SelectItem>
+                    <SelectItem value="critical">
+                      Crítica (Sistema parado / Impacto geral)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            {selectedSla && (
+              <div className="rounded-lg border bg-blue-500/10 border-blue-500/20 p-4 space-y-1.5 transition-all animate-fade-in">
+                <div className="flex items-center gap-2 font-medium text-blue-950 dark:text-blue-200">
+                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span>{selectedSla.solutionLabel}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pl-6">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>{selectedSla.responseLabel}</span>
+                </div>
+              </div>
+            )}
           </CardContent>
+
           <CardFooter className="flex justify-end gap-2 bg-muted/50 py-4 border-t">
             <Button variant="outline" type="button" onClick={() => navigate(-1)}>
               Cancelar

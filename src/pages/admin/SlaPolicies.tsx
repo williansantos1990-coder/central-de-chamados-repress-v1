@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/hooks/use-auth'
-import { Navigate } from 'react-router-dom'
+import { slaService, SlaPolicy, Category } from '@/services/sla'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -19,36 +19,47 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { slaService, Category, TicketPriority } from '@/services/sla'
-import { Trash2, Plus } from 'lucide-react'
+import { Plus, Trash2, Clock, Zap } from 'lucide-react'
+import { SLA_PRIORITY_CONFIG, formatDuration } from '@/lib/sla-utils'
 
-const priorityMap: Record<string, string> = {
-  low: 'Baixa',
-  medium: 'Média',
-  high: 'Alta',
-  critical: 'Crítica',
+const PRIORITY_BADGES = {
+  critical: 'bg-red-500 hover:bg-red-600 text-white',
+  high: 'bg-orange-500 hover:bg-orange-600 text-white',
+  medium: 'bg-amber-500 hover:bg-amber-600 text-white',
+  low: 'bg-emerald-500 hover:bg-emerald-600 text-white',
 }
 
 export default function SlaPolicies() {
-  const { profile } = useAuth()
-  const [policies, setPolicies] = useState<any[]>([])
+  const [policies, setPolicies] = useState<SlaPolicy[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [openModal, setOpenModal] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const [categoryId, setCategoryId] = useState('')
-  const [priority, setPriority] = useState<TicketPriority | ''>('')
-  const [duration, setDuration] = useState('')
+  const [form, setForm] = useState({
+    category_id: '',
+    priority: 'low',
+    response_time_hours: '8',
+    duration_hours: '72',
+  })
 
   const loadData = async () => {
     setLoading(true)
-    const [policiesRes, categoriesRes] = await Promise.all([
+    const [polRes, catRes] = await Promise.all([
       slaService.getPolicies(),
       slaService.getCategories(),
     ])
-    if (policiesRes.data) setPolicies(policiesRes.data)
-    if (categoriesRes.data) setCategories(categoriesRes.data)
+    setPolicies(polRes.data || [])
+    setCategories(catRes.data || [])
     setLoading(false)
   }
 
@@ -56,167 +67,217 @@ export default function SlaPolicies() {
     loadData()
   }, [])
 
-  if (profile?.role !== 'admin') {
-    return <Navigate to="/" replace />
+  const handlePriorityChange = (priority: string) => {
+    const config = SLA_PRIORITY_CONFIG[priority]
+    setForm((prev) => ({
+      ...prev,
+      priority,
+      response_time_hours: config ? String(config.responseTimeHours) : '8',
+      duration_hours: config ? String(config.solutionTimeHours) : '72',
+    }))
   }
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!categoryId || !priority || !duration) return
-
+    if (!form.category_id) {
+      toast.error('Selecione uma categoria')
+      return
+    }
+    setSaving(true)
     const { error } = await slaService.createPolicy({
-      category_id: categoryId,
-      priority,
-      duration_hours: parseInt(duration),
+      category_id: form.category_id,
+      priority: form.priority as any,
+      response_time_hours: Number(form.response_time_hours),
+      duration_hours: Number(form.duration_hours),
     })
+    setSaving(false)
 
     if (error) {
-      if (error.code === '23505') {
-        toast.error('Já existe uma política de SLA para esta categoria e prioridade.')
-      } else {
-        toast.error('Erro ao salvar política SLA.', { description: error.message })
-      }
+      toast.error('Erro ao salvar política SLA', { description: error.message })
     } else {
-      toast.success('Política SLA adicionada com sucesso.')
-      setCategoryId('')
-      setPriority('')
-      setDuration('')
+      toast.success('Política de SLA salva!')
+      setOpenModal(false)
       loadData()
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja remover esta política de SLA?')) return
+    if (!confirm('Deseja excluir esta política de SLA?')) return
     const { error } = await slaService.deletePolicy(id)
     if (error) {
-      toast.error('Erro ao remover política.', { description: error.message })
+      toast.error('Erro ao excluir', { description: error.message })
     } else {
-      toast.success('Política removida com sucesso.')
+      toast.success('Política excluída')
       loadData()
     }
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Políticas de SLA</h2>
-          <p className="text-muted-foreground">
-            Configure o prazo limite (em horas) para os chamados baseando-se na categoria e
-            prioridade.
+          <h1 className="text-2xl font-bold tracking-tight">Políticas de SLA</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie os prazos de resposta e solução dos chamados por categoria e prioridade.
           </p>
         </div>
+        <Button onClick={() => setOpenModal(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nova Política
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1 h-fit">
-          <CardHeader>
-            <CardTitle>Nova Política SLA</CardTitle>
-            <CardDescription>Defina as regras de prazo.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAdd} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="category">Categoria</Label>
-                <Select value={categoryId} onValueChange={setCategoryId} required>
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Object.entries(SLA_PRIORITY_CONFIG).map(([pKey, pConf]) => (
+          <Card key={pKey} className="border-border/60">
+            <CardHeader className="p-4 pb-2">
+              <div className="flex items-center justify-between">
+                <Badge className={PRIORITY_BADGES[pKey as keyof typeof PRIORITY_BADGES]}>
+                  {pConf.label}
+                </Badge>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority">Prioridade</Label>
-                <Select
-                  value={priority}
-                  onValueChange={(val) => setPriority(val as TicketPriority)}
-                  required
-                >
-                  <SelectTrigger id="priority">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="critical">Crítica</SelectItem>
-                  </SelectContent>
-                </Select>
+            </CardHeader>
+            <CardContent className="p-4 pt-1 space-y-1 text-xs">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>{pConf.responseLabel}</span>
               </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span>{pConf.solutionLabel}</span>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Políticas Cadastradas</CardTitle>
+          <CardDescription>Regras ativas aplicadas aos chamados da plataforma</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">Carregando...</div>
+          ) : policies.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Nenhuma política cadastrada.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead>Tempo de Resposta</TableHead>
+                  <TableHead>Tempo de Solução</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {policies.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.category?.name || 'Geral'}</TableCell>
+                    <TableCell>
+                      <Badge
+                        className={PRIORITY_BADGES[p.priority as keyof typeof PRIORITY_BADGES]}
+                      >
+                        {SLA_PRIORITY_CONFIG[p.priority]?.label || p.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{formatDuration(p.response_time_hours || 8)}</TableCell>
+                    <TableCell>{formatDuration(p.duration_hours)}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={openModal} onOpenChange={setOpenModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova Política de SLA</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select
+                value={form.category_id}
+                onValueChange={(v) => setForm({ ...form, category_id: v })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Prioridade</Label>
+              <Select value={form.priority} onValueChange={handlePriorityChange} required>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Baixa</SelectItem>
+                  <SelectItem value="medium">Média</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="critical">Crítica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="duration">Duração (Horas)</Label>
+                <Label>Tempo Resposta (Horas)</Label>
                 <Input
-                  id="duration"
                   type="number"
-                  min="1"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder="Ex: 24"
+                  step="0.1"
+                  min="0.1"
+                  value={form.response_time_hours}
+                  onChange={(e) => setForm({ ...form, response_time_hours: e.target.value })}
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
 
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Políticas Configuradas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-4 text-muted-foreground">Carregando...</div>
-            ) : policies.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground border border-dashed rounded-lg">
-                Nenhuma política de SLA configurada.
+              <div className="space-y-2">
+                <Label>Tempo Solução (Horas)</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={form.duration_hours}
+                  onChange={(e) => setForm({ ...form, duration_hours: e.target.value })}
+                  required
+                />
               </div>
-            ) : (
-              <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Prioridade</TableHead>
-                      <TableHead>Prazo (Horas)</TableHead>
-                      <TableHead className="w-[80px] text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {policies.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">{p.category?.name}</TableCell>
-                        <TableCell>{priorityMap[p.priority]}</TableCell>
-                        <TableCell>{p.duration_hours}h</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(p.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            title="Remover"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setOpenModal(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Salvando...' : 'Salvar Política'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

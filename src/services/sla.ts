@@ -4,10 +4,22 @@ import { Database } from '@/lib/supabase/types'
 export type Category = Database['public']['Tables']['categories']['Row']
 export type TicketPriority = Database['public']['Enums']['ticket_priority']
 
+export interface SlaPolicy {
+  id: string
+  category_id: string
+  priority: TicketPriority
+  duration_hours: number
+  response_time_hours?: number
+  created_at: string
+  updated_at: string
+  category?: Category
+}
+
 export interface SlaPolicyInsert {
   category_id: string
   priority: TicketPriority
   duration_hours: number
+  response_time_hours?: number
 }
 
 export const slaService = {
