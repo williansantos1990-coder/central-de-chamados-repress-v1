@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { ticketService, Ticket } from '@/services/tickets'
 import { slaService } from '@/services/sla'
 import {
@@ -10,13 +10,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useNavigate } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import { Search, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { SlaResponseBadge, SlaSolutionBadge } from '@/components/sla-risk-badge'
 import { buildSlaPolicyMap, SlaPolicyMap } from '@/lib/sla-utils'
 import { useAuth } from '@/hooks/use-auth'
+import { toast } from 'sonner'
 
 const priorityMap: Record<string, { label: string; color: string }> = {
   low: { label: 'Baixa', color: 'bg-green-500 hover:bg-green-600 text-white border-transparent' },
@@ -42,17 +44,62 @@ export default function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [search, setSearch] = useState('')
   const [policyMap, setPolicyMap] = useState<SlaPolicyMap>(new Map())
+  const [loading, setLoading] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
   const navigate = useNavigate()
   const { profile } = useAuth()
 
   const isAgentOrAdmin = profile?.role === 'agent' || profile?.role === 'admin'
 
-  useEffect(() => {
-    ticketService.getTickets().then(({ data }) => setTickets(data || []))
-    slaService.getPolicies().then(({ data }) => {
-      if (data) setPolicyMap(buildSlaPolicyMap(data))
-    })
+  const loadData = useCallback(async (isManual = false) => {
+    setLoading(true)
+    try {
+      const [{ data: ticketData }, { data: slaData }] = await Promise.all([
+        ticketService.getTickets(),
+        slaService.getPolicies(),
+      ])
+      if (ticketData) setTickets(ticketData)
+      if (slaData) setPolicyMap(buildSlaPolicyMap(slaData))
+      setLastUpdated(new Date())
+      if (isManual) {
+        toast.success('Lista de chamados atualizada com sucesso!')
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar chamados:', error)
+      if (isManual) {
+        toast.error('Erro ao atualizar lista de chamados')
+      }
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  const startAutoRefreshTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+    // Auto-refresh every 5 minutes (300,000 ms)
+    timerRef.current = setInterval(() => {
+      loadData(false)
+    }, 300000)
+  }, [loadData])
+
+  const handleManualRefresh = async () => {
+    await loadData(true)
+    startAutoRefreshTimer()
+  }
+
+  useEffect(() => {
+    loadData(false)
+    startAutoRefreshTimer()
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [loadData, startAutoRefreshTimer])
 
   const filtered = tickets.filter(
     (t) => t.title.toLowerCase().includes(search.toLowerCase()) || t.id.toString().includes(search),
@@ -60,7 +107,7 @@ export default function TicketList() {
 
   return (
     <div className="space-y-4 animate-fade-in-up">
-      <div className="flex items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-card p-4 rounded-lg border shadow-sm">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -69,6 +116,23 @@ export default function TicketList() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+        <div className="flex items-center gap-3 justify-between sm:justify-end">
+          {lastUpdated && (
+            <span className="text-xs text-muted-foreground">
+              Atualizado às {format(lastUpdated, 'HH:mm:ss')}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={loading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
         </div>
       </div>
 
