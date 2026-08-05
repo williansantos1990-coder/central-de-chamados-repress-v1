@@ -173,3 +173,76 @@ export function formatDuration(hours: number): string {
   const remainingHours = Math.round(hours % 24)
   return `${days}d ${remainingHours}h`
 }
+
+export interface SlaPolicyData {
+  response_time_hours: number | null
+  duration_hours: number
+}
+
+export type SlaPolicyMap = Map<string, SlaPolicyData>
+
+export function buildSlaPolicyMap(
+  policies: Array<{
+    category_id: string
+    priority: string
+    response_time_hours: number | null
+    duration_hours: number
+  }>,
+): SlaPolicyMap {
+  const map = new Map<string, SlaPolicyData>()
+  for (const p of policies) {
+    map.set(`${p.category_id}:${p.priority}`, {
+      response_time_hours: p.response_time_hours,
+      duration_hours: p.duration_hours,
+    })
+  }
+  return map
+}
+
+export function getSlaPolicyForTicket(
+  ticket: Ticket,
+  policyMap: SlaPolicyMap,
+): SlaPolicyData | null {
+  return policyMap.get(`${ticket.category_id}:${ticket.priority}`) ?? null
+}
+
+export function isResponseTimeAtRisk(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
+  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
+  if (!['open', 'analyzing'].includes(ticket.status)) return false
+  const policy = getSlaPolicyForTicket(ticket, policyMap)
+  if (!policy?.response_time_hours) return false
+  const hoursSinceCreation =
+    (new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60)
+  return (
+    hoursSinceCreation >= policy.response_time_hours * 0.5 &&
+    hoursSinceCreation <= policy.response_time_hours
+  )
+}
+
+export function isResponseTimeOverdue(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
+  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
+  if (!['open', 'analyzing'].includes(ticket.status)) return false
+  const policy = getSlaPolicyForTicket(ticket, policyMap)
+  if (!policy?.response_time_hours) return false
+  const hoursSinceCreation =
+    (new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60)
+  return hoursSinceCreation > policy.response_time_hours
+}
+
+export function isSolutionTimeAtRisk(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
+  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
+  if (ticket.deadline) {
+    const hoursRemaining = getTimeRemainingHours(ticket.deadline)
+    const policy = getSlaPolicyForTicket(ticket, policyMap)
+    const totalDuration = policy?.duration_hours ?? getSolutionTimeHours(ticket.priority)
+    const riskThresholdHours = Math.min(2, totalDuration * 0.25)
+    return hoursRemaining >= 0 && hoursRemaining <= riskThresholdHours
+  }
+  return false
+}
+
+export function isSolutionTimeOverdue(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
+  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
+  if (ticket.deadline && new Date() > new Date(ticket.deadline)) return true
+  return false
+}

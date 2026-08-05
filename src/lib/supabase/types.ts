@@ -192,6 +192,7 @@ export type Database = {
           id: number
           priority: Database['public']['Enums']['ticket_priority']
           requester_id: string
+          service_type: string | null
           status: Database['public']['Enums']['ticket_status']
           title: string
           updated_at: string
@@ -205,6 +206,7 @@ export type Database = {
           id?: never
           priority?: Database['public']['Enums']['ticket_priority']
           requester_id: string
+          service_type?: string | null
           status?: Database['public']['Enums']['ticket_status']
           title: string
           updated_at?: string
@@ -218,6 +220,7 @@ export type Database = {
           id?: never
           priority?: Database['public']['Enums']['ticket_priority']
           requester_id?: string
+          service_type?: string | null
           status?: Database['public']['Enums']['ticket_status']
           title?: string
           updated_at?: string

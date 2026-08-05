@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ticketService, Ticket } from '@/services/tickets'
+import { slaService } from '@/services/sla'
 import {
   Table,
   TableBody,
@@ -13,7 +14,9 @@ import { Badge } from '@/components/ui/badge'
 import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { format } from 'date-fns'
-import { SlaRiskBadge } from '@/components/sla-risk-badge'
+import { SlaResponseBadge, SlaSolutionBadge } from '@/components/sla-risk-badge'
+import { buildSlaPolicyMap, SlaPolicyMap } from '@/lib/sla-utils'
+import { useAuth } from '@/hooks/use-auth'
 
 const priorityMap: Record<string, { label: string; color: string }> = {
   low: { label: 'Baixa', color: 'bg-green-500 hover:bg-green-600 text-white border-transparent' },
@@ -38,10 +41,17 @@ const statusMap: Record<string, string> = {
 export default function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [search, setSearch] = useState('')
+  const [policyMap, setPolicyMap] = useState<SlaPolicyMap>(new Map())
   const navigate = useNavigate()
+  const { profile } = useAuth()
+
+  const isAgentOrAdmin = profile?.role === 'agent' || profile?.role === 'admin'
 
   useEffect(() => {
     ticketService.getTickets().then(({ data }) => setTickets(data || []))
+    slaService.getPolicies().then(({ data }) => {
+      if (data) setPolicyMap(buildSlaPolicyMap(data))
+    })
   }, [])
 
   const filtered = tickets.filter(
@@ -92,10 +102,7 @@ export default function TicketList() {
                 >
                   <TableCell className="font-medium">#{t.id}</TableCell>
                   <TableCell className="max-w-[200px]">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate">{t.title}</span>
-                      <SlaRiskBadge ticket={t} />
-                    </div>
+                    <span className="truncate">{t.title}</span>
                   </TableCell>
                   <TableCell>{t.requester?.full_name}</TableCell>
                   <TableCell>{t.category?.name}</TableCell>
@@ -108,7 +115,10 @@ export default function TicketList() {
                     <Badge variant="outline">{statusMap[t.status]}</Badge>
                   </TableCell>
                   <TableCell>
-                    <SlaRiskBadge ticket={t} />
+                    <div className="flex flex-col gap-1">
+                      {isAgentOrAdmin && <SlaResponseBadge ticket={t} policyMap={policyMap} />}
+                      <SlaSolutionBadge ticket={t} policyMap={policyMap} />
+                    </div>
                   </TableCell>
                   <TableCell>{t.assignee?.full_name || '-'}</TableCell>
                   <TableCell>{format(new Date(t.updated_at), 'dd/MM/yyyy HH:mm')}</TableCell>
