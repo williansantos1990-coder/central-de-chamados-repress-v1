@@ -15,6 +15,7 @@ import NewTicket from './pages/tickets/NewTicket'
 import TicketDetail from './pages/tickets/TicketDetail'
 import Users from './pages/admin/Users'
 import SlaPolicies from './pages/admin/SlaPolicies'
+import Productivity from './pages/admin/Productivity'
 import Reports from './pages/admin/Reports'
 import NotFound from './pages/NotFound'
 
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/tickets/:id" element={<TicketDetail />} />
             <Route path="/admin" element={<Users />} />
             <Route path="/admin/sla" element={<SlaPolicies />} />
+            <Route path="/admin/productivity" element={<Productivity />} />
             <Route path="/reports" element={<Reports />} />
           </Route>
           <Route path="*" element={<NotFound />} />

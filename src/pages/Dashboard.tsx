@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ticketService, Ticket } from '@/services/tickets'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { FileText, Clock, CheckCircle2, AlertCircle, Download } from 'lucide-react'
 import {
   ChartContainer,
   ChartTooltip,
@@ -12,8 +12,13 @@ import {
 import { Bar, BarChart, Pie, PieChart, Cell, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { PeriodFilter } from '@/components/period-filter'
+import { SlaRiskBadge } from '@/components/sla-risk-badge'
+import { filterTicketsByPeriod, isSlaOverdue, PeriodKey } from '@/lib/sla-utils'
+import { exportSlaToCsv } from '@/lib/export-utils'
 
 const priorityColors = { low: '#22c55e', medium: '#0ea5e9', high: '#f97316', critical: '#dc2626' }
 const statusColors = {
@@ -40,9 +45,17 @@ const chartConfig = {
   canceled: { label: 'Cancelado', color: statusColors.canceled },
 }
 
+const slaChartConfig = {
+  on_time: { label: 'No Prazo', color: '#3b82f6' },
+  overdue: { label: 'Atrasado', color: '#f97316' },
+}
+
 export default function Dashboard() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState<PeriodKey>('30d')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
 
   useEffect(() => {
     ticketService.getTickets().then(({ data }) => {
@@ -84,29 +97,19 @@ export default function Dashboard() {
     }))
     .filter((d) => d.value > 0)
 
+  const slaTickets = filterTicketsByPeriod(tickets, period, customStart, customEnd)
+
   let onTime = 0
   let overdue = 0
   let hasSlaTickets = false
 
-  tickets.forEach((t) => {
+  slaTickets.forEach((t) => {
     if (!t.deadline) return
     hasSlaTickets = true
-    const deadline = new Date(t.deadline).getTime()
-
-    if (['resolved', 'closed'].includes(t.status)) {
-      const updated = new Date(t.updated_at).getTime()
-      if (updated <= deadline) {
-        onTime++
-      } else {
-        overdue++
-      }
-    } else if (t.status !== 'canceled') {
-      const now = new Date().getTime()
-      if (now > deadline) {
-        overdue++
-      } else {
-        onTime++
-      }
+    if (isSlaOverdue(t)) {
+      overdue++
+    } else {
+      onTime++
     }
   })
 
@@ -117,13 +120,23 @@ export default function Dashboard() {
       ].filter((d) => d.value > 0)
     : []
 
-  const slaChartConfig = {
-    on_time: { label: 'No Prazo', color: '#3b82f6' },
-    overdue: { label: 'Atrasado', color: '#f97316' },
+  const handleExport = () => {
+    exportSlaToCsv(slaTickets)
   }
 
   return (
     <div className="space-y-6 animate-fade-in-up">
+      <div className="flex items-center justify-end">
+        <PeriodFilter
+          value={period}
+          onChange={setPeriod}
+          customStart={customStart}
+          customEnd={customEnd}
+          onCustomStartChange={setCustomStart}
+          onCustomEndChange={setCustomEnd}
+        />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -235,8 +248,9 @@ export default function Dashboard() {
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex flex-col gap-1">
-                    <span className="font-medium">
+                    <span className="font-medium flex items-center gap-2">
                       #{ticket.id} - {ticket.title}
+                      <SlaRiskBadge ticket={ticket} />
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {ticket.requester?.full_name} •{' '}
@@ -261,7 +275,19 @@ export default function Dashboard() {
 
         <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Cumprimento de SLA</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Cumprimento de SLA</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExport}
+                disabled={!hasSlaTickets}
+                className="h-7 text-xs"
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Exportar
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {hasSlaTickets ? (
@@ -291,7 +317,7 @@ export default function Dashboard() {
             ) : (
               <div className="h-[300px] flex items-center justify-center text-center text-muted-foreground p-4">
                 <div className="bg-muted/50 rounded-lg p-6 border-dashed border-2">
-                  <p>Nenhum dado de SLA disponível para acompanhamento.</p>
+                  <p>Nenhum dado de SLA disponível para o período selecionado.</p>
                 </div>
               </div>
             )}

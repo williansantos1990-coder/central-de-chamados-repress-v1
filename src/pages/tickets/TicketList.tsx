@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { format } from 'date-fns'
+import { SlaRiskBadge } from '@/components/sla-risk-badge'
+import { SlaRiskBadge } from '@/components/sla-risk-badge'
 
 const priorityMap: Record<string, { label: string; color: string }> = {
   low: { label: 'Baixa', color: 'bg-green-500 hover:bg-green-600 text-white border-transparent' },
@@ -71,6 +73,7 @@ export default function TicketList() {
               <TableHead>Categoria</TableHead>
               <TableHead>Prioridade</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>SLA</TableHead>
               <TableHead>Responsável</TableHead>
               <TableHead>Atualização</TableHead>
             </TableRow>
@@ -89,7 +92,12 @@ export default function TicketList() {
                   onClick={() => navigate(`/tickets/${t.id}`)}
                 >
                   <TableCell className="font-medium">#{t.id}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">{t.title}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate">{t.title}</span>
+                      <SlaRiskBadge ticket={t} />
+                    </div>
+                  </TableCell>
                   <TableCell>{t.requester?.full_name}</TableCell>
                   <TableCell>{t.category?.name}</TableCell>
                   <TableCell>
@@ -100,6 +108,9 @@ export default function TicketList() {
                   <TableCell>
                     <Badge variant="outline">{statusMap[t.status]}</Badge>
                   </TableCell>
+                  <TableCell>
+                    <SlaRiskBadge ticket={t} />
+                  </TableCell>
                   <TableCell>{t.assignee?.full_name || '-'}</TableCell>
                   <TableCell>{format(new Date(t.updated_at), 'dd/MM/yyyy HH:mm')}</TableCell>
                 </TableRow>
@@ -107,7 +118,7 @@ export default function TicketList() {
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   Nenhum chamado encontrado.
                 </TableCell>
               </TableRow>

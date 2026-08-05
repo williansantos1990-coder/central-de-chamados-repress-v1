@@ -21,6 +21,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
+import { SlaRiskBadge } from '@/components/sla-risk-badge'
 
 const statusMap: Record<string, string> = {
   open: 'Aberto',
@@ -331,9 +332,12 @@ export default function TicketDetail() {
             </div>
 
             <div className="pt-4 border-t border-dashed">
-              <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-2">
-                SLA / Prazo de Resolução
-              </span>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-muted-foreground text-xs uppercase tracking-wider">
+                  SLA / Prazo de Resolução
+                </span>
+                <SlaRiskBadge ticket={ticket} />
+              </div>
               {ticket.deadline ? (
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs font-medium">
