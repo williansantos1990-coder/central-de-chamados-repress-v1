@@ -17,8 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { SlaRiskBadge } from '@/components/sla-risk-badge'
 import { SlaCountdown } from '@/components/sla-countdown'
@@ -49,7 +47,6 @@ export default function TicketDetail() {
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
-  const [isInternal, setIsInternal] = useState(false)
 
   const fetchTicket = async () => {
     if (!id) return
@@ -70,11 +67,10 @@ export default function TicketDetail() {
       ticket_id: ticket.id,
       user_id: user.id,
       content: newComment,
-      is_internal: isInternal,
+      is_internal: false,
     })
     if (!error) {
       setNewComment('')
-      setIsInternal(false)
       fetchTicket()
     } else {
       toast.error('Erro ao adicionar comentário')
@@ -222,17 +218,7 @@ export default function TicketDetail() {
                 onChange={setNewComment}
                 minHeight="120px"
               />
-              <div className="flex items-center justify-between">
-                {isAgentOrAdmin ? (
-                  <div className="flex items-center gap-2">
-                    <Switch id="internal" checked={isInternal} onCheckedChange={setIsInternal} />
-                    <Label htmlFor="internal" className="cursor-pointer">
-                      Marcar como Interno
-                    </Label>
-                  </div>
-                ) : (
-                  <div />
-                )}
+              <div className="flex items-center justify-end">
                 <Button
                   onClick={handleAddComment}
                   disabled={!newComment.replace(/<[^>]*>/g, '').trim()}
