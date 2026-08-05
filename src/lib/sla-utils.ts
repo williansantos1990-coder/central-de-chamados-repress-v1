@@ -42,6 +42,48 @@ export const SLA_PRIORITY_CONFIG: Record<string, PrioritySlaConfig> = {
   },
 }
 
+export interface SlaPolicyData {
+  response_time_hours: number | null
+  duration_hours: number
+}
+
+export type SlaPolicyMap = Map<string, SlaPolicyData>
+
+export function buildSlaPolicyMap(policies: Array<any>): SlaPolicyMap {
+  const map = new Map<string, SlaPolicyData>()
+  if (Array.isArray(policies)) {
+    for (const p of policies) {
+      map.set(`${p.category_id}:${p.priority}`, {
+        response_time_hours: p.response_time_hours ?? null,
+        duration_hours: p.duration_hours,
+      })
+    }
+  }
+  return map
+}
+
+export function getPolicyForTicket(
+  ticket: Ticket,
+  policies?: SlaPolicyData[] | SlaPolicyMap | any[],
+): SlaPolicyData | null {
+  if (!ticket || !policies) return null
+  if (policies instanceof Map) {
+    return policies.get(`${ticket.category_id}:${ticket.priority}`) ?? null
+  }
+  if (Array.isArray(policies)) {
+    const found = policies.find(
+      (p: any) => p.category_id === ticket.category_id && p.priority === ticket.priority,
+    )
+    if (found) {
+      return {
+        response_time_hours: found.response_time_hours ?? null,
+        duration_hours: found.duration_hours,
+      }
+    }
+  }
+  return null
+}
+
 export function getResponseTimeHours(priority: string): number {
   return SLA_PRIORITY_CONFIG[priority]?.responseTimeHours ?? 8
 }
@@ -50,80 +92,183 @@ export function getSolutionTimeHours(priority: string): number {
   return SLA_PRIORITY_CONFIG[priority]?.solutionTimeHours ?? 72
 }
 
-export function getTicketResponseTimeHours(
-  ticket: Ticket,
-  policies?: SlaPolicyData[] | any[],
-): number {
+export function getTicketResponseTimeHours(ticket: Ticket, policies?: any): number {
   if (!ticket) return 8
-  if (policies && Array.isArray(policies) && ticket.category_id && ticket.priority) {
-    const policy = policies.find(
-      (p) => p.category_id === ticket.category_id && p.priority === ticket.priority,
-    )
-    if (policy && policy.response_time_hours != null) {
-      return Number(policy.response_time_hours)
-    }
-  }
+  const policy = getPolicyForTicket(ticket, policies)
+  if (policy && policy.response_time_hours != null) return Number(policy.response_time_hours)
   return getResponseTimeHours(ticket.priority)
 }
 
-export function getTimeRemainingHours(deadline: string): number {
-  const now = new Date().getTime()
-  const dl = new Date(deadline).getTime()
-  return (dl - now) / (1000 * 60 * 60)
+export function getTicketSolutionTimeHours(ticket: Ticket, policies?: any): number {
+  if (!ticket) return 72
+  const policy = getPolicyForTicket(ticket, policies)
+  if (policy && policy.duration_hours != null) return Number(policy.duration_hours)
+  return getSolutionTimeHours(ticket.priority)
+}
+
+export function getTicketResponseDeadline(ticket: Ticket, policies?: any): Date {
+  const hours = getTicketResponseTimeHours(ticket, policies)
+  const createdAtMs = new Date(ticket.created_at).getTime()
+  return new Date(createdAtMs + hours * 3600 * 1000)
+}
+
+export function getTicketSolutionDeadline(ticket: Ticket, policies?: any): Date | null {
+  if (!ticket) return null
+  if (ticket.deadline) return new Date(ticket.deadline)
+  const hours = getTicketSolutionTimeHours(ticket, policies)
+  if (!hours) return null
+  const createdAtMs = new Date(ticket.created_at).getTime()
+  return new Date(createdAtMs + hours * 3600 * 1000)
+}
+
+export function isTicketResponded(ticket: Ticket, comments?: any[]): boolean {
+  if (!ticket) return false
+  if (ticket.status !== 'open') return true
+  if (ticket.assignee_id) return true
+  if (comments && comments.length > 0) {
+    return comments.some(
+      (c) =>
+        c.user?.role === 'agent' ||
+        c.user?.role === 'admin' ||
+        (c.user_id && c.user_id !== ticket.requester_id),
+    )
+  }
+  return false
+}
+
+export interface SlaCountdownResult {
+  text: string
+  isExpired: boolean
+  isWarning: boolean
+  remainingMs: number
+}
+
+export function formatSlaCountdown(
+  deadline: string | Date,
+  nowMs: number = Date.now(),
+): SlaCountdownResult {
+  const deadlineMs = new Date(deadline).getTime()
+  const remainingMs = deadlineMs - nowMs
+
+  if (remainingMs <= 0) {
+    return { text: 'Expirado', isExpired: true, isWarning: false, remainingMs: 0 }
+  }
+
+  const totalSeconds = Math.floor(remainingMs / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const timeStr = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  const text = days > 0 ? `${days}d ${timeStr}` : timeStr
+  const isWarning = totalSeconds <= 3600
+
+  return { text, isExpired: false, isWarning, remainingMs }
+}
+
+export interface SlaPhaseResult {
+  phase: 'response' | 'solution'
+  isResponded?: boolean
+  isResolvedOrClosed?: boolean
+  deadline: Date | null
+  countdown: SlaCountdownResult
+  remainingPercent: number
+  status: 'completed' | 'expired' | 'warning' | 'on_time' | 'no_deadline'
+}
+
+export function getTicketResponseSla(
+  ticket: Ticket,
+  policies?: any,
+  comments?: any[],
+  nowMs: number = Date.now(),
+): SlaPhaseResult {
+  const responded = isTicketResponded(ticket, comments)
+  const hours = getTicketResponseTimeHours(ticket, policies)
+  const deadline = getTicketResponseDeadline(ticket, policies)
+  const countdown = formatSlaCountdown(deadline, nowMs)
+  const totalDurationMs = Math.max(1, hours * 3600 * 1000)
+  const remainingPercent = Math.max(
+    0,
+    Math.min(100, (countdown.remainingMs / totalDurationMs) * 100),
+  )
+
+  let status: 'completed' | 'expired' | 'warning' | 'on_time' = 'on_time'
+  if (responded) {
+    status = 'completed'
+  } else if (countdown.isExpired) {
+    status = 'expired'
+  } else if (countdown.isWarning) {
+    status = 'warning'
+  }
+
+  return {
+    phase: 'response',
+    isResponded: responded,
+    deadline,
+    countdown,
+    remainingPercent,
+    status,
+  }
+}
+
+export function getTicketSolutionSla(
+  ticket: Ticket,
+  policies?: any,
+  nowMs: number = Date.now(),
+): SlaPhaseResult {
+  const resolvedOrClosed = ['resolved', 'closed', 'canceled'].includes(ticket.status)
+  const deadline = getTicketSolutionDeadline(ticket, policies)
+
+  if (!deadline) {
+    return {
+      phase: 'solution',
+      isResolvedOrClosed: resolvedOrClosed,
+      deadline: null,
+      countdown: { text: 'Sem prazo', isExpired: false, isWarning: false, remainingMs: 0 },
+      remainingPercent: 0,
+      status: resolvedOrClosed ? 'completed' : 'no_deadline',
+    }
+  }
+
+  const countdown = formatSlaCountdown(deadline, nowMs)
+  const createdAtMs = new Date(ticket.created_at).getTime()
+  const totalDurationMs = Math.max(1, deadline.getTime() - createdAtMs)
+  const remainingPercent = Math.max(
+    0,
+    Math.min(100, (countdown.remainingMs / totalDurationMs) * 100),
+  )
+
+  let status: 'completed' | 'expired' | 'warning' | 'on_time' | 'no_deadline' = 'on_time'
+  if (resolvedOrClosed) {
+    status = 'completed'
+  } else if (countdown.isExpired) {
+    status = 'expired'
+  } else if (countdown.isWarning) {
+    status = 'warning'
+  }
+
+  return {
+    phase: 'solution',
+    isResolvedOrClosed: resolvedOrClosed,
+    deadline,
+    countdown,
+    remainingPercent,
+    status,
+  }
 }
 
 export function isSlaAtRisk(ticket: Ticket): boolean {
-  if (!ticket) return false
-  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
-
-  // 1. Response time risk check (for tickets awaiting initial response)
-  if (['open', 'analyzing'].includes(ticket.status)) {
-    const responseLimitHours = getResponseTimeHours(ticket.priority)
-    const hoursSinceCreation =
-      (new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60)
-    // Risk triggers at 50% of response threshold (e.g. 15m for critical 30m)
-    if (
-      hoursSinceCreation >= responseLimitHours * 0.5 &&
-      hoursSinceCreation <= responseLimitHours
-    ) {
-      return true
-    }
-  }
-
-  // 2. Resolution time risk check
-  if (ticket.deadline) {
-    const hoursRemaining = getTimeRemainingHours(ticket.deadline)
-    const totalDuration = getSolutionTimeHours(ticket.priority)
-    const riskThresholdHours = Math.min(2, totalDuration * 0.25)
-    if (hoursRemaining >= 0 && hoursRemaining <= riskThresholdHours) {
-      return true
-    }
-  }
-
-  return false
+  const res = getTicketResponseSla(ticket)
+  const sol = getTicketSolutionSla(ticket)
+  return res.status === 'warning' || sol.status === 'warning'
 }
 
 export function isSlaOverdue(ticket: Ticket): boolean {
-  if (!ticket) return false
-  if (['resolved', 'closed'].includes(ticket.status)) {
-    return ticket.deadline ? new Date(ticket.updated_at) > new Date(ticket.deadline) : false
-  }
-  if (ticket.status === 'canceled') return false
-
-  // Response time overdue check
-  if (['open', 'analyzing'].includes(ticket.status)) {
-    const responseLimitHours = getResponseTimeHours(ticket.priority)
-    const hoursSinceCreation =
-      (new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60)
-    if (hoursSinceCreation > responseLimitHours) return true
-  }
-
-  // Resolution deadline overdue check
-  if (ticket.deadline && new Date() > new Date(ticket.deadline)) {
-    return true
-  }
-
-  return false
+  const res = getTicketResponseSla(ticket)
+  const sol = getTicketSolutionSla(ticket)
+  return res.status === 'expired' || sol.status === 'expired'
 }
 
 export function getSlaStatus(ticket: Ticket): SlaStatus {
@@ -131,6 +276,22 @@ export function getSlaStatus(ticket: Ticket): SlaStatus {
   if (isSlaOverdue(ticket)) return 'overdue'
   if (isSlaAtRisk(ticket)) return 'at_risk'
   return 'on_time'
+}
+
+export function isResponseTimeAtRisk(ticket: Ticket, policyMap?: any): boolean {
+  return getTicketResponseSla(ticket, policyMap).status === 'warning'
+}
+
+export function isResponseTimeOverdue(ticket: Ticket, policyMap?: any): boolean {
+  return getTicketResponseSla(ticket, policyMap).status === 'expired'
+}
+
+export function isSolutionTimeAtRisk(ticket: Ticket, policyMap?: any): boolean {
+  return getTicketSolutionSla(ticket, policyMap).status === 'warning'
+}
+
+export function isSolutionTimeOverdue(ticket: Ticket, policyMap?: any): boolean {
+  return getTicketSolutionSla(ticket, policyMap).status === 'expired'
 }
 
 export function filterTicketsByPeriod(
@@ -162,9 +323,7 @@ export function filterTicketsByPeriod(
     case 'custom':
       if (!customStart) return tickets
       start = new Date(customStart)
-      if (customEnd) {
-        end = new Date(customEnd)
-      }
+      if (customEnd) end = new Date(customEnd)
       end.setHours(23, 59, 59, 999)
       break
     default:
@@ -178,124 +337,9 @@ export function filterTicketsByPeriod(
 }
 
 export function formatDuration(hours: number): string {
-  if (hours < 1) {
-    const mins = Math.round(hours * 60)
-    return `${mins}min`
-  }
-  if (hours < 24) {
-    return `${hours.toFixed(1)}h`
-  }
+  if (hours < 1) return `${Math.round(hours * 60)}min`
+  if (hours < 24) return `${hours.toFixed(1)}h`
   const days = Math.floor(hours / 24)
   const remainingHours = Math.round(hours % 24)
   return `${days}d ${remainingHours}h`
-}
-
-export interface SlaPolicyData {
-  response_time_hours: number | null
-  duration_hours: number
-}
-
-export type SlaPolicyMap = Map<string, SlaPolicyData>
-
-export function buildSlaPolicyMap(
-  policies: Array<{
-    category_id: string
-    priority: string
-    response_time_hours: number | null
-    duration_hours: number
-  }>,
-): SlaPolicyMap {
-  const map = new Map<string, SlaPolicyData>()
-  for (const p of policies) {
-    map.set(`${p.category_id}:${p.priority}`, {
-      response_time_hours: p.response_time_hours,
-      duration_hours: p.duration_hours,
-    })
-  }
-  return map
-}
-
-export function getSlaPolicyForTicket(
-  ticket: Ticket,
-  policyMap: SlaPolicyMap,
-): SlaPolicyData | null {
-  return policyMap.get(`${ticket.category_id}:${ticket.priority}`) ?? null
-}
-
-export function isResponseTimeAtRisk(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
-  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
-  if (!['open', 'analyzing'].includes(ticket.status)) return false
-  const policy = getSlaPolicyForTicket(ticket, policyMap)
-  if (!policy?.response_time_hours) return false
-  const hoursSinceCreation =
-    (new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60)
-  return (
-    hoursSinceCreation >= policy.response_time_hours * 0.5 &&
-    hoursSinceCreation <= policy.response_time_hours
-  )
-}
-
-export function isResponseTimeOverdue(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
-  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
-  if (!['open', 'analyzing'].includes(ticket.status)) return false
-  const policy = getSlaPolicyForTicket(ticket, policyMap)
-  if (!policy?.response_time_hours) return false
-  const hoursSinceCreation =
-    (new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60)
-  return hoursSinceCreation > policy.response_time_hours
-}
-
-export function isSolutionTimeAtRisk(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
-  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
-  if (ticket.deadline) {
-    const hoursRemaining = getTimeRemainingHours(ticket.deadline)
-    const policy = getSlaPolicyForTicket(ticket, policyMap)
-    const totalDuration = policy?.duration_hours ?? getSolutionTimeHours(ticket.priority)
-    const riskThresholdHours = Math.min(2, totalDuration * 0.25)
-    return hoursRemaining >= 0 && hoursRemaining <= riskThresholdHours
-  }
-  return false
-}
-
-export function isSolutionTimeOverdue(ticket: Ticket, policyMap: SlaPolicyMap): boolean {
-  if (['resolved', 'closed', 'canceled'].includes(ticket.status)) return false
-  if (ticket.deadline && new Date() > new Date(ticket.deadline)) return true
-  return false
-}
-
-export interface SlaCountdownResult {
-  text: string
-  isExpired: boolean
-  isWarning: boolean
-  remainingMs: number
-}
-
-export function formatSlaCountdown(
-  deadline: string | Date,
-  nowMs: number = Date.now(),
-): SlaCountdownResult {
-  const deadlineMs = new Date(deadline).getTime()
-  const remainingMs = deadlineMs - nowMs
-
-  if (remainingMs <= 0) {
-    return {
-      text: 'Expirado',
-      isExpired: true,
-      isWarning: false,
-      remainingMs: 0,
-    }
-  }
-
-  const totalSeconds = Math.floor(remainingMs / 1000)
-  const days = Math.floor(totalSeconds / 86400)
-  const hours = Math.floor((totalSeconds % 86400) / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const timeStr = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-  const text = days > 0 ? `${days}d ${timeStr}` : timeStr
-  const isWarning = totalSeconds <= 3600
-
-  return { text, isExpired: false, isWarning, remainingMs }
 }

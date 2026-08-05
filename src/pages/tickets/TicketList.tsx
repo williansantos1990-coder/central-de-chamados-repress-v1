@@ -15,8 +15,13 @@ import { Badge } from '@/components/ui/badge'
 import { useNavigate } from 'react-router-dom'
 import { Search, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
-import { SlaResponseBadge, SlaSolutionBadge } from '@/components/sla-risk-badge'
-import { buildSlaPolicyMap, SlaPolicyMap } from '@/lib/sla-utils'
+import { SlaTicketCell } from '@/components/sla-ticket-cell'
+import {
+  buildSlaPolicyMap,
+  SlaPolicyMap,
+  getTicketResponseSla,
+  getTicketSolutionSla,
+} from '@/lib/sla-utils'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 
@@ -79,7 +84,6 @@ export default function TicketList() {
     if (timerRef.current) {
       clearInterval(timerRef.current)
     }
-    // Auto-refresh every 5 minutes (300,000 ms)
     timerRef.current = setInterval(() => {
       loadData(false)
     }, 300000)
@@ -154,10 +158,12 @@ export default function TicketList() {
           <TableBody>
             {filtered.map((t) => {
               const isCritical = t.priority === 'critical'
+              const responseSla = getTicketResponseSla(t, policyMap)
+              const solutionSla = getTicketSolutionSla(t, policyMap)
               const isOverdue =
-                t.deadline &&
-                new Date(t.deadline) < new Date() &&
-                !['resolved', 'closed', 'canceled'].includes(t.status)
+                (!responseSla.isResponded && responseSla.status === 'expired') ||
+                (!solutionSla.isResolvedOrClosed && solutionSla.status === 'expired')
+
               return (
                 <TableRow
                   key={t.id}
@@ -179,10 +185,11 @@ export default function TicketList() {
                     <Badge variant="outline">{statusMap[t.status]}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      {isAgentOrAdmin && <SlaResponseBadge ticket={t} policyMap={policyMap} />}
-                      <SlaSolutionBadge ticket={t} policyMap={policyMap} />
-                    </div>
+                    <SlaTicketCell
+                      ticket={t}
+                      policyMap={policyMap}
+                      isAgentOrAdmin={isAgentOrAdmin}
+                    />
                   </TableCell>
                   <TableCell>{t.assignee?.full_name || '-'}</TableCell>
                   <TableCell>{format(new Date(t.updated_at), 'dd/MM/yyyy HH:mm')}</TableCell>

@@ -1,25 +1,22 @@
-import { AlertTriangle, Clock, AlarmClock } from 'lucide-react'
+import { AlertTriangle, Clock, AlarmClock, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import {
-  isSlaAtRisk,
-  isSlaOverdue,
-  getResponseTimeHours,
-  isResponseTimeAtRisk,
-  isResponseTimeOverdue,
-  isSolutionTimeAtRisk,
-  isSolutionTimeOverdue,
-  SlaPolicyMap,
-} from '@/lib/sla-utils'
+import { getTicketResponseSla, getTicketSolutionSla, SlaPolicyMap } from '@/lib/sla-utils'
 import { Ticket } from '@/services/tickets'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { SlaPolicy } from '@/services/sla'
 
 export function SlaRiskBadge({ ticket }: { ticket: Ticket }) {
-  const atRisk = isSlaAtRisk(ticket)
-  const overdue = isSlaOverdue(ticket)
+  const responseSla = getTicketResponseSla(ticket)
+  const solutionSla = getTicketSolutionSla(ticket)
 
-  if (!atRisk && !overdue) return null
+  const isResponseRisk = responseSla.status === 'warning' || responseSla.status === 'expired'
+  const isSolutionRisk = solutionSla.status === 'warning' || solutionSla.status === 'expired'
 
-  if (overdue) {
+  if (!isResponseRisk && !isSolutionRisk) return null
+
+  const isExpired = responseSla.status === 'expired' || solutionSla.status === 'expired'
+
+  if (isExpired) {
     return (
       <TooltipProvider>
         <Tooltip>
@@ -37,10 +34,6 @@ export function SlaRiskBadge({ ticket }: { ticket: Ticket }) {
     )
   }
 
-  const isResponseRisk = ['open', 'analyzing'].includes(ticket.status)
-  const responseHours = getResponseTimeHours(ticket.priority)
-  const responseMins = Math.round(responseHours * 60)
-
   return (
     <TooltipProvider>
       <Tooltip>
@@ -53,7 +46,7 @@ export function SlaRiskBadge({ ticket }: { ticket: Ticket }) {
         <TooltipContent>
           <p className="text-xs">
             {isResponseRisk
-              ? `Atenção: Limite de resposta (${responseMins}min) se aproximando`
+              ? 'Atenção: Limite de tempo de resposta se aproximando'
               : 'Atenção: Prazo de solução próximo do limite'}
           </p>
         </TooltipContent>
@@ -67,11 +60,29 @@ export function SlaResponseBadge({
   policyMap,
 }: {
   ticket: Ticket
-  policyMap: SlaPolicyMap
+  policyMap?: SlaPolicyMap | SlaPolicy[] | any[]
 }) {
-  const atRisk = isResponseTimeAtRisk(ticket, policyMap)
-  const overdue = isResponseTimeOverdue(ticket, policyMap)
-  if (!atRisk && !overdue) return null
+  const responseSla = getTicketResponseSla(ticket, policyMap)
+
+  if (responseSla.isResponded) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white border-transparent text-[10px] gap-1 px-1.5 py-0 shrink-0 font-medium">
+              <Check className="w-2.5 h-2.5" />
+              Resposta Concluída
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">Primeira resposta realizada com sucesso.</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  if (responseSla.status === 'on_time') return null
 
   return (
     <TooltipProvider>
@@ -79,20 +90,20 @@ export function SlaResponseBadge({
         <TooltipTrigger asChild>
           <Badge
             className={`text-[10px] gap-1 px-1.5 py-0 shrink-0 font-medium border-transparent text-white ${
-              overdue
+              responseSla.status === 'expired'
                 ? 'bg-red-600 hover:bg-red-700 animate-pulse'
-                : 'bg-blue-500 hover:bg-blue-600 animate-fade-in'
+                : 'bg-amber-500 hover:bg-amber-600 animate-fade-in'
             }`}
           >
             <Clock className="w-2.5 h-2.5" />
-            Tempo de Resposta
+            {responseSla.status === 'expired' ? 'Resposta Vencida' : 'Atenção Resposta'}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
           <p className="text-xs max-w-[220px]">
-            {overdue
-              ? 'Tempo de resposta excedido — limite interno para o primeiro atendimento ao solicitante foi atingido.'
-              : 'Atenção: tempo limite de resposta (primeiro atendimento ao solicitante) se aproximando.'}
+            {responseSla.status === 'expired'
+              ? 'Tempo de resposta excedido — limite interno para o primeiro atendimento foi atingido.'
+              : 'Atenção: tempo limite de resposta se aproximando.'}
           </p>
         </TooltipContent>
       </Tooltip>
@@ -105,11 +116,29 @@ export function SlaSolutionBadge({
   policyMap,
 }: {
   ticket: Ticket
-  policyMap: SlaPolicyMap
+  policyMap?: SlaPolicyMap | SlaPolicy[] | any[]
 }) {
-  const atRisk = isSolutionTimeAtRisk(ticket, policyMap)
-  const overdue = isSolutionTimeOverdue(ticket, policyMap)
-  if (!atRisk && !overdue) return null
+  const solutionSla = getTicketSolutionSla(ticket, policyMap)
+
+  if (solutionSla.isResolvedOrClosed) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white border-transparent text-[10px] gap-1 px-1.5 py-0 shrink-0 font-medium">
+              <Check className="w-2.5 h-2.5" />
+              Solução Concluída
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">Chamado resolvido ou encerrado.</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  if (solutionSla.status === 'on_time' || solutionSla.status === 'no_deadline') return null
 
   return (
     <TooltipProvider>
@@ -117,20 +146,20 @@ export function SlaSolutionBadge({
         <TooltipTrigger asChild>
           <Badge
             className={`text-[10px] gap-1 px-1.5 py-0 shrink-0 font-medium border-transparent text-white ${
-              overdue
+              solutionSla.status === 'expired'
                 ? 'bg-destructive hover:bg-destructive text-destructive-foreground animate-pulse'
                 : 'bg-amber-500 hover:bg-amber-600 animate-fade-in'
             }`}
           >
             <AlarmClock className="w-2.5 h-2.5" />
-            Tempo de Solução
+            {solutionSla.status === 'expired' ? 'Solução Vencida' : 'Atenção Solução'}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
           <p className="text-xs max-w-[220px]">
-            {overdue
+            {solutionSla.status === 'expired'
               ? 'Prazo de solução excedido — deadline final para resolução do chamado ultrapassado.'
-              : 'Atenção: prazo de solução (deadline final para resolução) se aproximando do limite.'}
+              : 'Atenção: prazo de solução se aproximando do limite.'}
           </p>
         </TooltipContent>
       </Tooltip>
