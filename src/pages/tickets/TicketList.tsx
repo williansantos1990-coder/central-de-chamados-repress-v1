@@ -147,7 +147,7 @@ export default function TicketList() {
               <TableHead>ID</TableHead>
               <TableHead>Título</TableHead>
               <TableHead>Solicitante</TableHead>
-              <TableHead>Categoria</TableHead>
+              <TableHead>Setor</TableHead>
               <TableHead>Prioridade</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>SLA</TableHead>

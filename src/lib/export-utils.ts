@@ -12,7 +12,7 @@ export function exportSlaToCsv(tickets: Ticket[]) {
   const headers = [
     'Ticket ID',
     'Título',
-    'Categoria',
+    'Setor',
     'Prioridade',
     'Solicitante',
     'Responsável',

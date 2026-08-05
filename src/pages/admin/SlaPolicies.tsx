@@ -118,7 +118,7 @@ export default function SlaPolicies() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Políticas de SLA</h1>
           <p className="text-sm text-muted-foreground">
-            Gerencie os prazos de resposta e solução dos chamados por categoria e prioridade.
+            Gerencie os prazos de resposta e solução dos chamados por setor e prioridade.
           </p>
         </div>
         <Button onClick={() => setOpenModal(true)}>
@@ -167,7 +167,7 @@ export default function SlaPolicies() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Categoria</TableHead>
+                  <TableHead>Setor</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Tempo de Resposta</TableHead>
                   <TableHead>Tempo de Solução</TableHead>
@@ -207,7 +207,7 @@ export default function SlaPolicies() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Categoria</Label>
+              <Label>Setor</Label>
               <Select
                 value={form.category_id}
                 onValueChange={(v) => setForm({ ...form, category_id: v })}

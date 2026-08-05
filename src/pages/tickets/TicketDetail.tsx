@@ -265,7 +265,7 @@ export default function TicketDetail() {
             </div>
             <div>
               <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">
-                Categoria
+                Setor
               </span>
               <div className="font-medium">{ticket.category?.name}</div>
             </div>
