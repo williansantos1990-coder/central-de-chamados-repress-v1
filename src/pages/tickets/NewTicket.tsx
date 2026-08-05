@@ -29,6 +29,7 @@ export default function NewTicket() {
     title: '',
     description: '',
     category_id: '',
+    service_type: 'suporte_tecnico',
     priority: 'low',
   })
 
@@ -94,7 +95,7 @@ export default function NewTicket() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Categoria</Label>
+                <Label>Setor</Label>
                 <Select
                   value={form.category_id}
                   onValueChange={(v) => setForm({ ...form, category_id: v })}
@@ -109,6 +110,27 @@ export default function NewTicket() {
                         {c.name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Serviço</Label>
+                <Select
+                  value={form.service_type}
+                  onValueChange={(v) => setForm({ ...form, service_type: v })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="suporte_tecnico">Suporte Técnico</SelectItem>
+                    <SelectItem value="manutencao">Manutenção</SelectItem>
+                    <SelectItem value="configuracao">Configuração</SelectItem>
+                    <SelectItem value="acesso_permissao">Acesso / Permissão</SelectItem>
+                    <SelectItem value="duvida">Dúvida</SelectItem>
+                    <SelectItem value="nova_funcionalidade">Nova Funcionalidade</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

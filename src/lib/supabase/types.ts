@@ -151,6 +151,7 @@ export type Database = {
           duration_hours: number
           id: string
           priority: Database['public']['Enums']['ticket_priority']
+          response_time_hours: number | null
           updated_at: string
         }
         Insert: {
@@ -159,6 +160,7 @@ export type Database = {
           duration_hours: number
           id?: string
           priority: Database['public']['Enums']['ticket_priority']
+          response_time_hours?: number | null
           updated_at?: string
         }
         Update: {
@@ -167,6 +169,7 @@ export type Database = {
           duration_hours?: number
           id?: string
           priority?: Database['public']['Enums']['ticket_priority']
+          response_time_hours?: number | null
           updated_at?: string
         }
         Relationships: [

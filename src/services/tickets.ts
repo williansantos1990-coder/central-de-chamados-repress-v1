@@ -7,6 +7,7 @@ export type Ticket = {
   requester_id: string
   assignee_id: string | null
   category_id: string
+  service_type: string
   priority: 'low' | 'medium' | 'high' | 'critical'
   status:
     | 'open'
