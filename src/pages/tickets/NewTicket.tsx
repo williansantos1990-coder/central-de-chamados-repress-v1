@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import {
   Select,
   SelectContent,
@@ -42,6 +42,11 @@ export default function NewTicket() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
+    const plainDesc = form.description.replace(/<[^>]*>/g, '').trim()
+    if (!plainDesc) {
+      toast.error('A descrição é obrigatória')
+      return
+    }
     setLoading(true)
 
     const solutionHours = getSolutionTimeHours(form.priority)
@@ -84,12 +89,11 @@ export default function NewTicket() {
 
             <div className="space-y-2">
               <Label>Descrição</Label>
-              <Textarea
+              <RichTextEditor
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                required
-                rows={7}
+                onChange={(html) => setForm({ ...form, description: html })}
                 placeholder="Descreva os detalhes da sua solicitação..."
+                minHeight="200px"
               />
             </div>
 

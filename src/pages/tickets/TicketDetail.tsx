@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -64,7 +64,8 @@ export default function TicketDetail() {
   }, [id])
 
   const handleAddComment = async () => {
-    if (!newComment.trim() || !user || !ticket) return
+    const plainText = newComment.replace(/<[^>]*>/g, '').trim()
+    if (!plainText || !user || !ticket) return
     const { error } = await commentService.addComment({
       ticket_id: ticket.id,
       user_id: user.id,
@@ -159,8 +160,12 @@ export default function TicketDetail() {
             )}
           </CardHeader>
           <CardContent>
-            <div className="prose dark:prose-invert max-w-none text-sm">
-              <p className="whitespace-pre-wrap">{ticket.description}</p>
+            <div className="prose dark:prose-invert max-w-none text-sm rich-content">
+              {ticket.description.includes('<') ? (
+                <div dangerouslySetInnerHTML={{ __html: ticket.description }} />
+              ) : (
+                <p className="whitespace-pre-wrap">{ticket.description}</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -210,7 +215,13 @@ export default function TicketDetail() {
                       Nota Interna (Apenas Agentes)
                     </Badge>
                   )}
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed mt-2">{c.content}</p>
+                  <div className="text-sm leading-relaxed mt-2 rich-content">
+                    {c.content.includes('<') ? (
+                      <div dangerouslySetInnerHTML={{ __html: c.content }} />
+                    ) : (
+                      <p className="whitespace-pre-wrap">{c.content}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -218,12 +229,11 @@ export default function TicketDetail() {
 
           <Card className="shadow-sm mt-8 border-primary/20">
             <CardContent className="p-4 space-y-4">
-              <Textarea
+              <RichTextEditor
                 placeholder="Adicione um comentário ou nota..."
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                rows={4}
-                className="resize-none"
+                onChange={setNewComment}
+                minHeight="120px"
               />
               <div className="flex items-center justify-between">
                 {isAgentOrAdmin ? (
@@ -236,7 +246,10 @@ export default function TicketDetail() {
                 ) : (
                   <div />
                 )}
-                <Button onClick={handleAddComment} disabled={!newComment.trim()}>
+                <Button
+                  onClick={handleAddComment}
+                  disabled={!newComment.replace(/<[^>]*>/g, '').trim()}
+                >
                   Enviar Comentário
                 </Button>
               </div>
