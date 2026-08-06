@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ticketService, Ticket } from '@/services/tickets'
 import { commentService } from '@/services/comments'
+import { activityLogService } from '@/services/activity-log'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +31,24 @@ const statusMap: Record<string, string> = {
   closed: 'Fechado',
   canceled: 'Cancelado',
 }
+
+const serviceTypeMap: Record<string, string> = {
+  suporte_tecnico: 'Suporte Técnico',
+  manutencao: 'Manutenção',
+  configuracao: 'Configuração',
+  acesso_permissao: 'Acesso / Permissão',
+  duvida: 'Dúvida',
+  nova_funcionalidade: 'Nova Funcionalidade',
+}
+
+const serviceTypeOptions = [
+  { value: 'suporte_tecnico', label: 'Suporte Técnico' },
+  { value: 'manutencao', label: 'Manutenção' },
+  { value: 'configuracao', label: 'Configuração' },
+  { value: 'acesso_permissao', label: 'Acesso / Permissão' },
+  { value: 'duvida', label: 'Dúvida' },
+  { value: 'nova_funcionalidade', label: 'Nova Funcionalidade' },
+]
 
 const priorityMap: Record<string, { label: string; color: string }> = {
   low: { label: 'Baixa', color: 'bg-green-500 hover:bg-green-600 text-white border-transparent' },
@@ -98,6 +117,32 @@ export default function TicketDetail() {
       fetchTicket()
     } else {
       toast.error('Erro ao atualizar prioridade', { description: error.message })
+    }
+  }
+
+  const handleServiceTypeChange = async (serviceType: string) => {
+    if (!ticket || !user) return
+    const oldValue = ticket.service_type
+      ? serviceTypeMap[ticket.service_type] || ticket.service_type
+      : 'Não informado'
+    const newValue = serviceTypeMap[serviceType] || serviceType
+
+    const { error } = await ticketService.updateTicket(ticket.id, {
+      service_type: serviceType,
+    })
+
+    if (!error) {
+      await activityLogService.logActivity({
+        ticket_id: ticket.id,
+        user_id: user.id,
+        action_type: 'update',
+        old_value: oldValue,
+        new_value: newValue,
+      })
+      toast.success('Tipo de serviço atualizado')
+      fetchTicket()
+    } else {
+      toast.error('Erro ao atualizar tipo de serviço', { description: error.message })
     }
   }
 
@@ -268,6 +313,31 @@ export default function TicketDetail() {
                 Setor
               </span>
               <div className="font-medium">{ticket.category?.name}</div>
+            </div>
+            <div>
+              <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">
+                Tipo de Serviço
+              </span>
+              {isAgentOrAdmin && !isResolvedOrClosed ? (
+                <Select value={ticket.service_type || ''} onValueChange={handleServiceTypeChange}>
+                  <SelectTrigger className="h-8 w-full text-xs font-medium">
+                    <SelectValue placeholder="Selecione o tipo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceTypeOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="font-medium">
+                  {ticket.service_type
+                    ? serviceTypeMap[ticket.service_type] || ticket.service_type
+                    : 'Não informado'}
+                </div>
+              )}
             </div>
             <div>
               <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">

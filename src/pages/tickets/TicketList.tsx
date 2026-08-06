@@ -45,6 +45,21 @@ const statusMap: Record<string, string> = {
   canceled: 'Cancelado',
 }
 
+const serviceTypeMap: Record<string, string> = {
+  suporte_tecnico: 'Suporte Técnico',
+  sistemas: 'Sistemas',
+  hardware: 'Hardware',
+  redes: 'Redes',
+  acessos: 'Acessos / Permissões',
+  impressoras: 'Impressoras',
+  outros: 'Outros',
+}
+
+const formatServiceType = (type?: string | null) => {
+  if (!type) return '-'
+  return serviceTypeMap[type] || type
+}
+
 export default function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [search, setSearch] = useState('')
@@ -140,7 +155,7 @@ export default function TicketList() {
         </div>
       </div>
 
-      <div className="border rounded-lg bg-card shadow-sm overflow-hidden">
+      <div className="border rounded-lg bg-card shadow-sm overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -148,6 +163,7 @@ export default function TicketList() {
               <TableHead>Título</TableHead>
               <TableHead>Solicitante</TableHead>
               <TableHead>Setor</TableHead>
+              <TableHead>Tipo de Serviço</TableHead>
               <TableHead>Prioridade</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>SLA</TableHead>
@@ -175,7 +191,10 @@ export default function TicketList() {
                     <span className="truncate">{t.title}</span>
                   </TableCell>
                   <TableCell>{t.requester?.full_name}</TableCell>
-                  <TableCell>{t.category?.name}</TableCell>
+                  <TableCell>{t.category?.name || '-'}</TableCell>
+                  <TableCell className="max-w-[160px] truncate">
+                    {formatServiceType(t.service_type)}
+                  </TableCell>
                   <TableCell>
                     <Badge className={priorityMap[t.priority]?.color} variant="secondary">
                       {priorityMap[t.priority]?.label}
@@ -198,7 +217,7 @@ export default function TicketList() {
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   Nenhum chamado encontrado.
                 </TableCell>
               </TableRow>
