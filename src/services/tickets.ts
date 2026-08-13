@@ -68,4 +68,12 @@ export const ticketService = {
       .single()
     return { data: data as unknown as Ticket, error }
   },
+  async getAssignees() {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, role')
+      .in('role', ['admin', 'agent'])
+      .order('full_name', { ascending: true })
+    return { data, error }
+  },
 }

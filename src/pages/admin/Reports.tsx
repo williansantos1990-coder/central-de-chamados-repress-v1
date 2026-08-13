@@ -142,7 +142,7 @@ export default function Reports() {
                         axisLine={false}
                       />
                       <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartTooltip content={<ChartTooltipContent payload={[]} />} />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="resolved" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="overdue" fill="#f97316" radius={[4, 4, 0, 0]} />

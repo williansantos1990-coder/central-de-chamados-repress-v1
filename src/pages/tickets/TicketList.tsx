@@ -66,7 +66,7 @@ export default function TicketList() {
   const [policyMap, setPolicyMap] = useState<SlaPolicyMap>(new Map())
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const navigate = useNavigate()
   const { profile } = useAuth()
 

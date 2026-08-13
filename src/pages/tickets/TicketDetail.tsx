@@ -61,6 +61,13 @@ const priorityMap: Record<string, { label: string; color: string }> = {
   },
 }
 
+interface AssigneeProfile {
+  id: string
+  full_name: string
+  email: string
+  role: string
+}
+
 export default function TicketDetail() {
   const { id } = useParams()
   const { user, profile } = useAuth()
@@ -68,6 +75,7 @@ export default function TicketDetail() {
   const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
   const [categories, setCategories] = useState<Category[]>([])
+  const [assignees, setAssignees] = useState<AssigneeProfile[]>([])
 
   const fetchTicket = async () => {
     if (!id) return
@@ -83,6 +91,7 @@ export default function TicketDetail() {
 
   useEffect(() => {
     categoryService.getCategories().then(({ data }) => setCategories(data || []))
+    ticketService.getAssignees().then(({ data }) => setAssignees(data || []))
   }, [])
 
   const handleAddComment = async () => {
@@ -149,6 +158,30 @@ export default function TicketDetail() {
       fetchTicket()
     } else {
       toast.error('Erro ao atualizar tipo de serviço', { description: error.message })
+    }
+  }
+
+  const handleAssigneeChange = async (newAssigneeId: string) => {
+    if (!ticket || !user) return
+    const actualId = newAssigneeId === 'unassigned' ? null : newAssigneeId
+    const oldAssigneeName = ticket.assignee?.full_name || 'Não atribuído'
+    const newAssignee = assignees.find((a) => a.id === actualId)
+    const newAssigneeName = newAssignee?.full_name || 'Não atribuído'
+
+    const { error } = await ticketService.updateTicket(ticket.id, { assignee_id: actualId })
+
+    if (!error) {
+      await activityLogService.logActivity({
+        ticket_id: ticket.id,
+        user_id: user.id,
+        action_type: 'update',
+        old_value: oldAssigneeName,
+        new_value: newAssigneeName,
+      })
+      toast.success('Responsável atualizado')
+      fetchTicket()
+    } else {
+      toast.error('Erro ao atualizar responsável', { description: error.message })
     }
   }
 
@@ -322,19 +355,27 @@ export default function TicketDetail() {
               <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">
                 Responsável
               </span>
-              <div className="font-medium">{ticket.assignee?.full_name || 'Não atribuído'}</div>
-              {isAgentOrAdmin && !ticket.assignee_id && !isResolvedOrClosed && (
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-xs"
-                  onClick={() =>
-                    ticketService
-                      .updateTicket(ticket.id, { assignee_id: user?.id as string })
-                      .then(fetchTicket)
-                  }
+              {isAgentOrAdmin && !isResolvedOrClosed ? (
+                <Select
+                  value={ticket.assignee_id || 'unassigned'}
+                  onValueChange={handleAssigneeChange}
                 >
-                  Atribuir a mim
-                </Button>
+                  <SelectTrigger className="h-8 w-full text-xs font-medium">
+                    <SelectValue placeholder="Selecione o responsável..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned" className="text-xs italic text-muted-foreground">
+                      Não atribuído
+                    </SelectItem>
+                    {assignees.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id} className="text-xs">
+                        {agent.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="font-medium">{ticket.assignee?.full_name || 'Não atribuído'}</div>
               )}
             </div>
             <div>

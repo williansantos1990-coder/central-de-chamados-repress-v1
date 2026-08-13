@@ -193,7 +193,7 @@ export default function Dashboard() {
                   tickFormatter={(v) => chartConfig[v as keyof typeof chartConfig]?.label || v}
                 />
                 <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip content={<ChartTooltipContent payload={[]} />} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {priorityData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
