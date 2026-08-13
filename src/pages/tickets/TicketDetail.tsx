@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ticketService, Ticket } from '@/services/tickets'
 import { commentService } from '@/services/comments'
 import { activityLogService } from '@/services/activity-log'
+import { categoryService, Category } from '@/services/categories'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -66,6 +67,7 @@ export default function TicketDetail() {
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
 
   const fetchTicket = async () => {
     if (!id) return
@@ -78,6 +80,10 @@ export default function TicketDetail() {
   useEffect(() => {
     fetchTicket()
   }, [id])
+
+  useEffect(() => {
+    categoryService.getCategories().then(({ data }) => setCategories(data || []))
+  }, [])
 
   const handleAddComment = async () => {
     const plainText = newComment.replace(/<[^>]*>/g, '').trim()
@@ -143,6 +149,29 @@ export default function TicketDetail() {
       fetchTicket()
     } else {
       toast.error('Erro ao atualizar tipo de serviço', { description: error.message })
+    }
+  }
+
+  const handleCategoryChange = async (categoryId: string) => {
+    if (!ticket || !user) return
+    const oldName = ticket.category?.name || 'Não informado'
+    const newCat = categories.find((c) => c.id === categoryId)
+    const newName = newCat?.name || 'Não informado'
+
+    const { error } = await ticketService.updateTicket(ticket.id, { category_id: categoryId })
+
+    if (!error) {
+      await activityLogService.logActivity({
+        ticket_id: ticket.id,
+        user_id: user.id,
+        action_type: 'update',
+        old_value: oldName,
+        new_value: newName,
+      })
+      toast.success('Setor atualizado')
+      fetchTicket()
+    } else {
+      toast.error('Erro ao atualizar setor', { description: error.message })
     }
   }
 
@@ -312,7 +341,22 @@ export default function TicketDetail() {
               <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">
                 Setor
               </span>
-              <div className="font-medium">{ticket.category?.name}</div>
+              {isAgentOrAdmin && !isResolvedOrClosed ? (
+                <Select value={ticket.category_id} onValueChange={handleCategoryChange}>
+                  <SelectTrigger className="h-8 w-full text-xs font-medium">
+                    <SelectValue placeholder="Selecione o setor..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs">
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="font-medium">{ticket.category?.name}</div>
+              )}
             </div>
             <div>
               <span className="text-muted-foreground text-xs uppercase tracking-wider block mb-1">
