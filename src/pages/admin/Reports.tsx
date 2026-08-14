@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { AgentProductivity, reportService } from '@/services/reports'
+import { PeriodFilter } from '@/components/period-filter'
+import { PeriodKey, formatDuration } from '@/lib/sla-utils'
+import { exportProductivityToCsv } from '@/lib/export-utils'
+import { Button } from '@/components/ui/button'
+import { FileSpreadsheet } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -22,7 +27,6 @@ import {
 } from '@/components/ui/chart'
 import { Bar, BarChart, XAxis, YAxis } from 'recharts'
 import { CheckCircle2, AlertCircle, Gauge, Timer, Users } from 'lucide-react'
-import { formatDuration } from '@/lib/sla-utils'
 
 const chartConfig = {
   resolved: { label: 'Resolvidos', color: '#3b82f6' },
@@ -32,13 +36,21 @@ const chartConfig = {
 export default function Reports() {
   const [agents, setAgents] = useState<AgentProductivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState<PeriodKey>('month')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
 
   useEffect(() => {
-    reportService.getProductivity().then((data) => {
+    setLoading(true)
+    reportService.getProductivity(period, customStart, customEnd).then((data) => {
       setAgents(data ?? [])
       setLoading(false)
     })
-  }, [])
+  }, [period, customStart, customEnd])
+
+  const handleExport = () => {
+    exportProductivityToCsv(agents)
+  }
 
   const totalResolved = agents.reduce((sum, a) => sum + a.total_resolved, 0)
   const totalOverdue = agents.reduce((sum, a) => sum + a.total_overdue, 0)
@@ -59,11 +71,28 @@ export default function Reports() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Relatórios de Produtividade</h2>
-        <p className="text-muted-foreground">
-          Acompanhe o desempenho da equipe de suporte na resolução de chamados.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Relatórios de Produtividade</h2>
+          <p className="text-muted-foreground">
+            Acompanhe o desempenho da equipe de suporte na resolução de chamados.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodFilter
+            value={period}
+            onChange={setPeriod}
+            customStart={customStart}
+            customEnd={customEnd}
+            onCustomStartChange={setCustomStart}
+            onCustomEndChange={setCustomEnd}
+          />
+          <Button variant="outline" onClick={handleExport} className="flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            Exportar Excel
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -315,14 +315,15 @@ export function filterTicketsByPeriod(
       start.setDate(start.getDate() - 30)
       break
     case 'month':
-      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
       break
     case 'year':
-      start = new Date(now.getFullYear(), 0, 1)
+      start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0)
       break
     case 'custom':
       if (!customStart) return tickets
       start = new Date(customStart)
+      start.setHours(0, 0, 0, 0)
       if (customEnd) end = new Date(customEnd)
       end.setHours(23, 59, 59, 999)
       break
@@ -332,7 +333,8 @@ export function filterTicketsByPeriod(
 
   return tickets.filter((t) => {
     const created = new Date(t.created_at)
-    return created >= start && created <= end
+    const updated = new Date(t.updated_at)
+    return (created >= start && created <= end) || (updated >= start && updated <= end)
   })
 }
 

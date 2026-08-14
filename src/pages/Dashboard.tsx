@@ -227,7 +227,7 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip content={<ChartTooltipContent payload={[]} />} />
               </PieChart>
             </ChartContainer>
           </CardContent>
@@ -310,7 +310,7 @@ export default function Dashboard() {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartTooltip content={<ChartTooltipContent payload={[]} />} />
                   <ChartLegend content={<ChartLegendContent />} />
                 </PieChart>
               </ChartContainer>

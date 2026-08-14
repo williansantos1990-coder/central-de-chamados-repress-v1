@@ -1,5 +1,6 @@
 import { Ticket } from '@/services/tickets'
-import { isSlaOverdue } from './sla-utils'
+import { AgentProductivity } from '@/services/reports'
+import { formatDuration, isSlaOverdue } from './sla-utils'
 
 const priorityLabels: Record<string, string> = {
   low: 'Baixa',
@@ -47,6 +48,37 @@ export function exportSlaToCsv(tickets: Ticket[]) {
   const link = document.createElement('a')
   link.href = url
   link.download = `relatorio-sla-${new Date().toISOString().split('T')[0]}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export function exportProductivityToCsv(agents: AgentProductivity[]) {
+  const headers = [
+    'Agente',
+    'E-mail',
+    'Atribuídos',
+    'Resolvidos',
+    'Atrasados',
+    'Taxa de SLA (%)',
+    'Tempo Médio',
+  ]
+
+  const rows = agents.map((a) => [
+    `"${a.assignee_name.replace(/"/g, '""')}"`,
+    `"${a.assignee_email.replace(/"/g, '""')}"`,
+    a.total_assigned,
+    a.total_resolved,
+    a.total_overdue,
+    `"${a.sla_compliance_pct.toFixed(1)}%"`,
+    `"${formatDuration(a.avg_resolution_hours)}"`,
+  ])
+
+  const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `relatorio-produtividade-${new Date().toISOString().split('T')[0]}.csv`
   link.click()
   URL.revokeObjectURL(url)
 }

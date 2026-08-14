@@ -18,7 +18,11 @@ interface ReportTicket extends Ticket {
 }
 
 export const reportService = {
-  async getProductivity(): Promise<AgentProductivity[]> {
+  async getProductivity(
+    period: string = 'month',
+    customStart?: string,
+    customEnd?: string,
+  ): Promise<AgentProductivity[]> {
     const { data, error } = await supabase
       .from('tickets')
       .select(
@@ -32,7 +36,50 @@ export const reportService = {
 
     if (error || !data) return []
 
-    const tickets = data as unknown as ReportTicket[]
+    let tickets = data as unknown as ReportTicket[]
+
+    // Filtrar os tickets pelo período selecionado
+    if (period !== 'all') {
+      const now = new Date()
+      let start: Date
+      let end: Date = now
+
+      switch (period) {
+        case '7d':
+          start = new Date(now)
+          start.setDate(start.getDate() - 7)
+          break
+        case '30d':
+          start = new Date(now)
+          start.setDate(start.getDate() - 30)
+          break
+        case 'month':
+          start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
+          break
+        case 'year':
+          start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0)
+          break
+        case 'custom':
+          if (customStart) {
+            start = new Date(customStart)
+            start.setHours(0, 0, 0, 0)
+            if (customEnd) end = new Date(customEnd)
+            end.setHours(23, 59, 59, 999)
+          } else {
+            start = new Date(0)
+          }
+          break
+        default:
+          start = new Date(0)
+      }
+
+      tickets = tickets.filter((t) => {
+        const created = new Date(t.created_at)
+        const updated = new Date(t.updated_at)
+        return (created >= start && created <= end) || (updated >= start && updated <= end)
+      })
+    }
+
     const agentMap = new Map<
       string,
       {
