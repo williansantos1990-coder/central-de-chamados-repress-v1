@@ -118,8 +118,14 @@ export default function Users() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!createForm.full_name.trim() || !createForm.email.trim() || !createForm.password) {
-      toast.error('Preencha nome, e-mail e senha temporária.')
+    if (
+      !createForm.full_name.trim() ||
+      !createForm.email.trim() ||
+      !createForm.password ||
+      !createForm.sector.trim() ||
+      !createForm.role
+    ) {
+      toast.error('Preencha todos os campos obrigatórios: Nome, E-mail, Senha, Perfil e Setor.')
       return
     }
     setCreating(true)
@@ -157,6 +163,15 @@ export default function Users() {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editTarget) return
+    if (
+      !editForm.full_name?.trim() ||
+      !editForm.email?.trim() ||
+      !(editForm.sector as string)?.trim() ||
+      !editForm.role
+    ) {
+      toast.error('Preencha todos os campos obrigatórios: Nome, E-mail, Perfil e Setor.')
+      return
+    }
     setSavingEdit(true)
     const { error } = await userService.update(editTarget.id, {
       full_name: editForm.full_name?.trim(),
@@ -249,7 +264,7 @@ export default function Users() {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Perfil</TableHead>
                 <TableHead className="hidden md:table-cell">Setor</TableHead>
-                <TableHead className="hidden lg:table-cell">Telefone</TableHead>
+                <TableHead className="hidden lg:table-cell">Ramal</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -401,21 +416,25 @@ export default function Users() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="c-sector">Setor</Label>
+                <Label htmlFor="c-sector">Setor *</Label>
                 <Input
                   id="c-sector"
                   value={createForm.sector}
                   onChange={(e) => setCreateForm({ ...createForm, sector: e.target.value })}
                   placeholder="Ex.: TI"
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="c-phone">Telefone</Label>
+                <Label htmlFor="c-phone">
+                  Ramal{' '}
+                  <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
+                </Label>
                 <Input
                   id="c-phone"
                   value={createForm.phone}
                   onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
-                  placeholder="(00) 00000-0000"
+                  placeholder="Ex.: 1042"
                 />
               </div>
             </div>
@@ -491,21 +510,25 @@ export default function Users() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="e-sector">Setor</Label>
+                <Label htmlFor="e-sector">Setor *</Label>
                 <Input
                   id="e-sector"
                   value={(editForm.sector as string) || ''}
                   onChange={(e) => setEditForm({ ...editForm, sector: e.target.value })}
                   placeholder="Ex.: TI"
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="e-phone">Telefone</Label>
+                <Label htmlFor="e-phone">
+                  Ramal{' '}
+                  <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
+                </Label>
                 <Input
                   id="e-phone"
                   value={(editForm.phone as string) || ''}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  placeholder="(00) 00000-0000"
+                  placeholder="Ex.: 1042"
                 />
               </div>
             </div>
