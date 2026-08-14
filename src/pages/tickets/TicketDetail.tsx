@@ -4,6 +4,7 @@ import { ticketService, Ticket } from '@/services/tickets'
 import { commentService } from '@/services/comments'
 import { activityLogService } from '@/services/activity-log'
 import { categoryService, Category } from '@/services/categories'
+import { notificationService } from '@/services/notifications'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -97,13 +98,25 @@ export default function TicketDetail() {
   const handleAddComment = async () => {
     const plainText = newComment.replace(/<[^>]*>/g, '').trim()
     if (!plainText || !user || !ticket) return
-    const { error } = await commentService.addComment({
+    const { data: createdComment, error } = await commentService.addComment({
       ticket_id: ticket.id,
       user_id: user.id,
       content: newComment,
       is_internal: false,
     })
     if (!error) {
+      notificationService
+        .sendNotification({
+          event: 'comment',
+          ticket_id: ticket.id,
+          actor_id: user.id,
+          details: {
+            comment_content: newComment,
+            is_internal: false,
+          },
+        })
+        .catch((err) => console.error('Erro ao notificar comentário:', err))
+
       setNewComment('')
       fetchTicket()
     } else {
@@ -112,9 +125,23 @@ export default function TicketDetail() {
   }
 
   const handleStatusChange = async (status: string) => {
-    if (!ticket) return
+    if (!ticket || !user) return
+    const oldStatus = ticket.status
     const { error } = await ticketService.updateTicket(ticket.id, { status: status as any })
     if (!error) {
+      const isResolution = ['resolved', 'closed'].includes(status)
+      notificationService
+        .sendNotification({
+          event: isResolution ? 'resolution' : 'status_change',
+          ticket_id: ticket.id,
+          actor_id: user.id,
+          details: {
+            old_status: oldStatus,
+            new_status: status,
+          },
+        })
+        .catch((err) => console.error('Erro ao notificar alteração de status:', err))
+
       toast.success('Status atualizado')
       fetchTicket()
     }
@@ -174,10 +201,25 @@ export default function TicketDetail() {
       await activityLogService.logActivity({
         ticket_id: ticket.id,
         user_id: user.id,
-        action_type: 'update',
+        action_type: 'redirection',
         old_value: oldAssigneeName,
-        new_value: newAssigneeName,
+        new_value: `Chamado redirecionado de ${oldAssigneeName} para ${newAssigneeName}`,
       })
+
+      notificationService
+        .sendNotification({
+          event: 'redirection',
+          ticket_id: ticket.id,
+          actor_id: user.id,
+          details: {
+            old_assignee_name: oldAssigneeName,
+            new_assignee_name: newAssigneeName,
+            redirect_from: oldAssigneeName,
+            redirect_to: newAssigneeName,
+          },
+        })
+        .catch((err) => console.error('Erro ao notificar redirecionamento:', err))
+
       toast.success('Responsável atualizado')
       fetchTicket()
     } else {

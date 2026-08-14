@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { SLA_PRIORITY_CONFIG, getSolutionTimeHours } from '@/lib/sla-utils'
+import { notificationService } from '@/services/notifications'
 import { Clock, ShieldAlert, Info } from 'lucide-react'
 
 export default function NewTicket() {
@@ -64,6 +65,15 @@ export default function NewTicket() {
     if (error) {
       toast.error('Erro ao criar chamado', { description: error.message })
     } else {
+      // Disparar notificação por e-mail (Novo Chamado)
+      notificationService
+        .sendNotification({
+          event: 'new_ticket',
+          ticket_id: data.id,
+          actor_id: user.id,
+        })
+        .catch((err) => console.error('Erro ao enviar e-mail de novo chamado:', err))
+
       toast.success('Chamado criado com sucesso!')
       navigate(`/tickets/${data.id}`)
     }
