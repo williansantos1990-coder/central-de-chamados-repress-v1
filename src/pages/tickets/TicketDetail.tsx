@@ -198,6 +198,8 @@ export default function TicketDetail() {
     const { error } = await ticketService.updateTicket(ticket.id, { assignee_id: actualId })
 
     if (!error) {
+      const wasUnassigned = !ticket.assignee_id
+
       await activityLogService.logActivity({
         ticket_id: ticket.id,
         user_id: user.id,
@@ -208,7 +210,7 @@ export default function TicketDetail() {
 
       notificationService
         .sendNotification({
-          event: 'redirection',
+          event: wasUnassigned ? 'assignment' : 'redirection',
           ticket_id: ticket.id,
           actor_id: user.id,
           details: {
@@ -218,7 +220,12 @@ export default function TicketDetail() {
             redirect_to: newAssigneeName,
           },
         })
-        .catch((err) => console.error('Erro ao notificar redirecionamento:', err))
+        .catch((err) =>
+          console.error(
+            wasUnassigned ? 'Erro ao notificar atribuição:' : 'Erro ao notificar redirecionamento:',
+            err,
+          ),
+        )
 
       toast.success('Responsável atualizado')
       fetchTicket()
