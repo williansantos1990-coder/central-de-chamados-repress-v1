@@ -12,6 +12,10 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || ''
 const FROM_EMAIL = 'suporte@ti.repress.com.br'
 const FROM_NAME = 'Central de Chamados Repress'
 
+// Bypass de auto-bloqueio para fins de teste/revisão: este e-mail recebe
+// TODAS as notificações, mesmo quando é Solicitante = Atendente (autor da ação).
+const BYPASS_AUTO_BLOCK_EMAIL = 'Willian.santos1990@gmail.com'
+
 interface SendNotificationPayload {
   event: 'new_ticket' | 'assignment' | 'status_change' | 'comment' | 'redirection' | 'resolution'
   ticket_id: number
@@ -243,7 +247,7 @@ Deno.serve(async (req: Request) => {
 
       const staffEmails = (staffMembers || [])
         .map((s) => s.email)
-        .filter((e) => e && e !== requesterEmail)
+        .filter((e) => e && (e === BYPASS_AUTO_BLOCK_EMAIL || e !== requesterEmail))
 
       if (staffEmails.length > 0) {
         const staffHtml = renderEmailTemplate(
@@ -313,7 +317,11 @@ Deno.serve(async (req: Request) => {
       }
 
       // Notify new Assignee (if assigned and email exists)
-      if (assigneeEmail && assigneeEmail !== actor_id) {
+      // Bypass: o e-mail de teste/revisão recebe mesmo sendo o autor da ação.
+      if (
+        assigneeEmail &&
+        (assigneeEmail === BYPASS_AUTO_BLOCK_EMAIL || assigneeEmail !== actor_id)
+      ) {
         const assSubject = `[Atribuição #${ticket.id}] Você assumiu / foi atribuído ao chamado`
         const assContent = `
           <h2>Novo Chamado sob sua Responsabilidade</h2>
@@ -420,7 +428,10 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        const validRecipients = recipients.filter((e) => e && e !== actorEmail)
+        // Bypass de auto-bloqueio: o e-mail de teste/revisão recebe mesmo sendo o autor da ação.
+        const validRecipients = recipients.filter(
+          (e) => e && (e === BYPASS_AUTO_BLOCK_EMAIL || e !== actorEmail),
+        )
 
         if (validRecipients.length > 0) {
           const subject = `[Nova Interação #${ticket.id}] ${ticket.title}`
