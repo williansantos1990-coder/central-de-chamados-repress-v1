@@ -13,13 +13,11 @@ const FROM_EMAIL = 'suporte@ti.repress.com.br'
 const FROM_NAME = 'Central de Chamados Repress'
 
 // Diagnóstico de carga do segredo da Resend (AÇÃO REQUERIDA 3)
-if (RESEND_API_KEY) {
-  console.log(
-    '[send-email-notification] RESEND_API_KEY carregada com sucesso (len=' +
-      RESEND_API_KEY.length +
-      ').',
-  )
-} else {
+console.log(
+  'RESEND_API_KEY carregada:',
+  RESEND_API_KEY ? 'SIM (tamanho ' + RESEND_API_KEY.length + ')' : 'NÃO',
+)
+if (!RESEND_API_KEY) {
   console.error(
     '[send-email-notification] RESEND_API_KEY NÃO encontrada nos segredos — a função não conseguirá enviar e-mails.',
   )
@@ -27,7 +25,8 @@ if (RESEND_API_KEY) {
 
 // Bypass de auto-bloqueio para fins de teste/revisão: este e-mail recebe
 // TODAS as notificações, mesmo quando é Solicitante = Atendente (autor da ação).
-const BYPASS_AUTO_BLOCK_EMAIL = 'Willian.santos1990@gmail.com'
+const BYPASS_AUTO_BLOCK_EMAIL = 'willian.santos1990@gmail.com' // case-insensitive matching handled below
+const bypassEmail = (e: string | undefined) => !!e && e.toLowerCase() === BYPASS_AUTO_BLOCK_EMAIL
 
 interface SendNotificationPayload {
   event: 'new_ticket' | 'assignment' | 'status_change' | 'comment' | 'redirection' | 'resolution'
@@ -91,11 +90,25 @@ async function sendResendEmail(to: string[], subject: string, html: string) {
     const data = await res.json()
     if (!res.ok) {
       console.error('Resend API error:', data)
+      console.error('Falha no envio de e-mail via Resend (status ' + res.status + ').', {
+        to: validEmails,
+        subject,
+      })
       return { error: data }
     }
+    console.log('E-mail enviado com sucesso via Resend.', {
+      to: validEmails,
+      subject,
+      id: data?.id,
+    })
     return { ok: true, data }
   } catch (err) {
     console.error('Error calling Resend API:', err)
+    console.error('Exceção ao enviar e-mail via Resend.', {
+      to: validEmails,
+      subject,
+      err: String(err),
+    })
     return { error: String(err) }
   }
 }
@@ -154,12 +167,7 @@ Deno.serve(async (req: Request) => {
     const { event, ticket_id, actor_id, details } = payload
 
     // Diagnóstico de invocação (AÇÃO REQUERIDA 3)
-    console.log('[send-email-notification] Invocada.', {
-      event,
-      ticket_id,
-      actor_id: actor_id || null,
-      has_details: !!details,
-    })
+    console.log('send-email-notification chamada', { event, ticket_id, actor_id })
 
     if (!ticket_id) {
       return new Response(JSON.stringify({ error: 'ticket_id is required' }), {
@@ -268,7 +276,7 @@ Deno.serve(async (req: Request) => {
 
       const staffEmails = (staffMembers || [])
         .map((s) => s.email)
-        .filter((e) => e && (e === BYPASS_AUTO_BLOCK_EMAIL || e !== requesterEmail))
+        .filter((e) => e && (bypassEmail(e) || e !== requesterEmail))
 
       if (staffEmails.length > 0) {
         const staffHtml = renderEmailTemplate(
@@ -339,10 +347,7 @@ Deno.serve(async (req: Request) => {
 
       // Notify new Assignee (if assigned and email exists)
       // Bypass: o e-mail de teste/revisão recebe mesmo sendo o autor da ação.
-      if (
-        assigneeEmail &&
-        (assigneeEmail === BYPASS_AUTO_BLOCK_EMAIL || assigneeEmail !== actor_id)
-      ) {
+      if (assigneeEmail && (bypassEmail(assigneeEmail) || assigneeEmail !== actor_id)) {
         const assSubject = `[Atribuição #${ticket.id}] Você assumiu / foi atribuído ao chamado`
         const assContent = `
           <h2>Novo Chamado sob sua Responsabilidade</h2>
@@ -450,9 +455,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Bypass de auto-bloqueio: o e-mail de teste/revisão recebe mesmo sendo o autor da ação.
-        const validRecipients = recipients.filter(
-          (e) => e && (e === BYPASS_AUTO_BLOCK_EMAIL || e !== actorEmail),
-        )
+        const validRecipients = recipients.filter((e) => e && (bypassEmail(e) || e !== actorEmail))
 
         if (validRecipients.length > 0) {
           const subject = `[Nova Interação #${ticket.id}] ${ticket.title}`
