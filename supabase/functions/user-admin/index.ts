@@ -157,8 +157,27 @@ Deno.serve(async (req: Request) => {
         })
       }
 
+      // Primeiro exclui o perfil do usuário em public.profiles (e tabelas filhas via CASCADE/SET NULL)
+      const { error: profileDelError } = await adminClient
+        .from('profiles')
+        .delete()
+        .eq('id', userId)
+
+      if (profileDelError) {
+        console.error('Erro ao excluir profile:', profileDelError)
+        return new Response(
+          JSON.stringify({ error: `Erro ao remover perfil: ${profileDelError.message}` }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          },
+        )
+      }
+
+      // Em seguida exclui o usuário do auth.users
       const { error: delError } = await adminClient.auth.admin.deleteUser(userId)
       if (delError) {
+        console.error('Erro ao excluir usuário auth:', delError)
         return new Response(JSON.stringify({ error: delError.message }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
