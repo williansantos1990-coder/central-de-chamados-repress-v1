@@ -65,13 +65,13 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const url = new URL(req.url)
-  const action = url.searchParams.get('action')
-
   try {
+    // O frontend envia `action` dentro do corpo da requisição, e não na query string.
+    const body = await req.json()
+    const action = body.action as string | undefined
+
     // ===== CREATE USER =====
     if (req.method === 'POST' && action === 'create') {
-      const body = await req.json()
       const { email, password, full_name, role, phone, sector } = body as {
         email: string
         password: string
@@ -141,7 +141,6 @@ Deno.serve(async (req: Request) => {
 
     // ===== DELETE USER =====
     if (req.method === 'POST' && action === 'delete') {
-      const body = await req.json()
       const { userId } = body as { userId: string }
 
       if (!userId) {
