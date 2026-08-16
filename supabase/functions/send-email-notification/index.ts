@@ -12,6 +12,19 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || ''
 const FROM_EMAIL = 'suporte@ti.repress.com.br'
 const FROM_NAME = 'Central de Chamados Repress'
 
+// Diagnóstico de carga do segredo da Resend (AÇÃO REQUERIDA 3)
+if (RESEND_API_KEY) {
+  console.log(
+    '[send-email-notification] RESEND_API_KEY carregada com sucesso (len=' +
+      RESEND_API_KEY.length +
+      ').',
+  )
+} else {
+  console.error(
+    '[send-email-notification] RESEND_API_KEY NÃO encontrada nos segredos — a função não conseguirá enviar e-mails.',
+  )
+}
+
 // Bypass de auto-bloqueio para fins de teste/revisão: este e-mail recebe
 // TODAS as notificações, mesmo quando é Solicitante = Atendente (autor da ação).
 const BYPASS_AUTO_BLOCK_EMAIL = 'Willian.santos1990@gmail.com'
@@ -139,6 +152,14 @@ Deno.serve(async (req: Request) => {
 
     const payload: SendNotificationPayload = await req.json()
     const { event, ticket_id, actor_id, details } = payload
+
+    // Diagnóstico de invocação (AÇÃO REQUERIDA 3)
+    console.log('[send-email-notification] Invocada.', {
+      event,
+      ticket_id,
+      actor_id: actor_id || null,
+      has_details: !!details,
+    })
 
     if (!ticket_id) {
       return new Response(JSON.stringify({ error: 'ticket_id is required' }), {
